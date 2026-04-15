@@ -141,8 +141,10 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
       if (groupingCourseId === courseToDelete) setGroupingCourseId('');
       setCourseToDelete(null);
       showStatus('success', '과정이 삭제되었습니다.');
-    } catch (e) {
-      showStatus('error', '과정 삭제에 실패했습니다.');
+    } catch (e: any) {
+      const reason = e?.message || '알 수 없는 오류';
+      showStatus('error', `과정 삭제에 실패했습니다: ${reason}`);
+      console.error('과정 삭제 실패:', e);
     } finally {
       setIsProcessing(false);
     }

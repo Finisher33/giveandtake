@@ -570,8 +570,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       await commitBatch();
       console.log("Deletion complete.");
-    } catch (error) {
-      console.error("Error deleting course:", error);
+    } catch (error: any) {
+      const errorCode = error?.code || '';
+      const errorMessage = error?.message || String(error);
+      console.error("Error deleting course:", errorCode, errorMessage);
+
+      if (errorCode === 'permission-denied') {
+        throw new Error('권한이 없습니다. 어드민 계정으로 로그인되어 있는지 확인해주세요.');
+      }
+      if (errorCode === 'not-found') {
+        throw new Error('삭제할 과정을 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.');
+      }
       handleFirestoreError(error, OperationType.DELETE, `courses/${id}`);
     }
   };
