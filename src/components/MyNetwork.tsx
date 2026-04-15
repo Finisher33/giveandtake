@@ -177,22 +177,54 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
           1. SNA 종합 분석
       ════════════════════════════════════════════════════════════════════════ */}
       <section className="space-y-5">
-        <SectionTitle icon="analytics" title="SNA 종합 분석" />
+        <SectionTitle icon="analytics" title="SNS(Social Network Analysis) 종합 분석" />
 
         {!snaResult ? (
           <p className="text-xs text-on-surface-variant italic p-4 bg-surface rounded-xl border border-outline">
             분석하기에 데이터가 부족합니다. 관심사를 등록하고 동료들과 연결되면 분석 결과를 확인할 수 있습니다.
           </p>
+        ) : snaResult.allZero ? (
+          /* 모든 점수가 0 → 유형 미결정 안내 */
+          <div className="bg-surface-container-low border border-outline rounded-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🔍</span>
+              <div>
+                <p className="text-sm font-bold text-on-surface">아직 유형을 특정하기 어렵습니다</p>
+                <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                  데이터가 부족하여 네트워크 유형 분석이 불가합니다.<br />
+                  관심 키워드를 등록하고 다른 리더들과 연결되면 정확한 유형을 확인할 수 있습니다.
+                </p>
+              </div>
+            </div>
+            {/* 점수 바 (모두 0) */}
+            <div className="space-y-3 pt-2 border-t border-outline/30">
+              {snaResult.types.map((t, idx) => (
+                <div key={idx} className="bg-surface border border-outline/50 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{t.icon}</span>
+                      <div>
+                        <p className="text-xs font-bold text-on-surface/50">{t.type}</p>
+                        <p className="text-[9px] text-on-surface-variant/50 uppercase tracking-widest">{t.metricName}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-black text-on-surface-variant/40">0</span>
+                  </div>
+                  <div className="h-1.5 bg-surface-container-low rounded-full" />
+                </div>
+              ))}
+            </div>
+          </div>
         ) : (
           <>
             {/* Dominant type card */}
             <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6 flex gap-4 items-start">
-              <div className="text-4xl shrink-0">{snaResult.dominant.icon}</div>
+              <div className="text-4xl shrink-0">{snaResult.dominant!.icon}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest mb-0.5">{snaResult.dominant.metricName} 최고</p>
-                <h3 className="text-xl font-black text-primary mb-2">{snaResult.dominant.type} 유형</h3>
-                <p className="text-xs text-on-surface-variant leading-relaxed">{snaResult.dominant.description}</p>
-                <p className="text-[10px] text-primary/70 font-medium mt-2">{snaResult.dominant.detail}</p>
+                <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest mb-0.5">{snaResult.dominant!.metricName} 최고</p>
+                <h3 className="text-xl font-black text-primary mb-2">{snaResult.dominant!.type} 유형</h3>
+                <p className="text-xs text-on-surface-variant leading-relaxed">{snaResult.dominant!.description}</p>
+                <p className="text-[10px] text-primary/70 font-medium mt-2">{snaResult.dominant!.detail}</p>
               </div>
             </div>
 
@@ -208,13 +240,13 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                         <p className="text-[9px] text-on-surface-variant uppercase tracking-widest">{t.metricName}</p>
                       </div>
                     </div>
-                    <span className={`text-base font-black ${t.type === snaResult.dominant.type ? 'text-primary' : 'text-on-surface-variant'}`}>
+                    <span className={`text-base font-black ${t.type === snaResult.dominant!.type ? 'text-primary' : 'text-on-surface-variant'}`}>
                       {t.score.toFixed(0)}
                     </span>
                   </div>
                   <div className="h-2 bg-surface-container-low rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all duration-700 ${t.type === snaResult.dominant.type ? 'bg-primary' : 'bg-on-surface-variant/30'}`}
+                      className={`h-full rounded-full transition-all duration-700 ${t.type === snaResult.dominant!.type ? 'bg-primary' : 'bg-on-surface-variant/30'}`}
                       style={{ width: `${Math.max(2, t.score)}%` }}
                     />
                   </div>

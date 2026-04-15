@@ -13,7 +13,8 @@ export interface SNATypeResult {
 
 export interface SNAResult {
   types: SNATypeResult[];
-  dominant: SNATypeResult;
+  dominant: SNATypeResult | null;
+  allZero: boolean;
 }
 
 export interface HotKeyword {
@@ -69,13 +70,14 @@ export function calculateSNAScores(currentUser: User, db: any): SNAResult | null
     return dist;
   };
 
-  // 1. 연결 중심성 (마당발)
+  // 1. 연결 중심성 (마당발) — 연결된 리더가 0명이면 키워드와 무관하게 0점
   const myKwCount = userKeywords.get(currentUser.id)?.size || 0;
   const myNeighborCount = userIds.filter(id => id !== currentUser.id && areConnected(currentUser.id, id)).length;
-  const degreeRaw = myKwCount + myNeighborCount;
   const allUniqueKws = new Set(courseInterests.map((i: Interest) => i.canonicalId || i.keyword)).size;
   const degreeMax = Math.max(1, allUniqueKws + (n - 1));
-  const degreeScore = Math.min(100, (degreeRaw / degreeMax) * 100);
+  const degreeScore = myNeighborCount === 0
+    ? 0
+    : Math.min(100, ((myKwCount + myNeighborCount) / degreeMax) * 100);
 
   // 2. 매개 중심성 (게이트키퍼)
   const distFromMe = bfs(currentUser.id);
@@ -143,8 +145,9 @@ export function calculateSNAScores(currentUser: User, db: any): SNAResult | null
     },
   ];
 
-  const dominant = types.reduce((a, b) => a.score >= b.score ? a : b);
-  return { types, dominant };
+  const allZero = types.every(t => t.score === 0);
+  const dominant = allZero ? null : types.reduce((a, b) => a.score >= b.score ? a : b);
+  return { types, dominant, allZero };
 }
 
 // ─── HOT KEYWORDS 계산 ───────────────────────────────────────────────────────

@@ -73,8 +73,23 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
 
+    // 유저 모드: 본인 + 연결된 유저만 표시 / 관리자 모드: 전체 표시
+    let visibleUsers = courseUsers;
+    if (!adminCourseId && currentUser) {
+      const myKws = userKeywordMap.get(currentUser.id) || new Set<string>();
+      const connectedIds = new Set<string>([currentUser.id]);
+      courseUsers.forEach(u => {
+        if (u.id === currentUser.id) return;
+        const theirKws = userKeywordMap.get(u.id) || new Set<string>();
+        for (const kw of myKws) {
+          if (theirKws.has(kw)) { connectedIds.add(u.id); break; }
+        }
+      });
+      visibleUsers = courseUsers.filter(u => connectedIds.has(u.id));
+    }
+
     // Build nodes
-    const simNodes: PeopleNode[] = courseUsers.map(u => ({
+    const simNodes: PeopleNode[] = visibleUsers.map(u => ({
       id: u.id,
       label: u.name,
       isMe: u.id === currentUser?.id,
@@ -83,14 +98,14 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
 
     // Build links: connect every pair sharing ≥1 keyword
     const simLinks: PeopleLink[] = [];
-    for (let i = 0; i < courseUsers.length; i++) {
-      for (let j = i + 1; j < courseUsers.length; j++) {
-        const kwA = userKeywordMap.get(courseUsers[i].id) || new Set<string>();
-        const kwB = userKeywordMap.get(courseUsers[j].id) || new Set<string>();
+    for (let i = 0; i < visibleUsers.length; i++) {
+      for (let j = i + 1; j < visibleUsers.length; j++) {
+        const kwA = userKeywordMap.get(visibleUsers[i].id) || new Set<string>();
+        const kwB = userKeywordMap.get(visibleUsers[j].id) || new Set<string>();
         let shared = 0;
         for (const kw of kwA) { if (kwB.has(kw)) shared++; }
         if (shared > 0) {
-          simLinks.push({ source: courseUsers[i].id, target: courseUsers[j].id, weight: shared });
+          simLinks.push({ source: visibleUsers[i].id, target: visibleUsers[j].id, weight: shared });
         }
       }
     }
@@ -363,10 +378,14 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
       </div>
 
       {/* Empty state */}
-      {courseUsers.length === 0 && (
+      {nodes.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/40 gap-3">
           <span className="material-symbols-outlined text-6xl">group_off</span>
-          <p className="text-sm font-bold">등록된 리더가 없습니다.</p>
+          <p className="text-sm font-bold">
+            {courseUsers.length === 0
+              ? '등록된 리더가 없습니다.'
+              : '아직 연결된 리더가 없습니다. 관심 키워드를 등록해보세요.'}
+          </p>
         </div>
       )}
 

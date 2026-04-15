@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore, UserInsight } from '../store';
 import { motion, AnimatePresence } from 'motion/react';
 import NotificationBell from './NotificationBell';
+import * as d3 from 'd3';
 
 interface InsightViewProps {
   onBack?: () => void;
@@ -18,28 +19,36 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
   const [activeTab, setActiveTab] = useState<'my' | 'classroom'>(adminCourseId ? 'classroom' : 'my');
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [classroomSessionId, setClassroomSessionId] = useState<string>(db.sessions.find(s => s.courseId === effectiveCourseId)?.id || '');
-  
+
   const [keyword, setKeyword] = useState('');
   const [description, setDescription] = useState('');
   const [selectedKeywordDetail, setSelectedKeywordDetail] = useState<string | null>(null);
   const [revealedBubbles, setRevealedBubbles] = useState<Record<string, Set<string>>>({});
 
+  // Bubble chart simulation state
+  const [bubblePositions, setBubblePositions] = useState<Record<string, {x: number, y: number, r: number}>>({});
+  const [isBubbleFullScreen, setIsBubbleFullScreen] = useState(false);
+  const bubbleContainerRef = useRef<HTMLDivElement>(null);
+  const bubbleWrapRef = useRef<HTMLDivElement>(null);
+
   const activeSessions = db.sessions.filter(s => s.courseId === effectiveCourseId && s.isActive);
   const userInsights = (db.userInsights || []).filter(i => i.userId === currentUser?.id);
 
+  // Prevent duplicate: reuse existing insight ID if one exists for this session
   const handleSaveInsight = (sessionId: string) => {
     if (!keyword.trim() || !description.trim()) {
       alert('키워드와 설명을 모두 입력해주세요.');
       return;
     }
 
+    const existing = userInsights.find(i => i.sessionId === sessionId);
     const insight: UserInsight = {
-      id: Date.now().toString(),
+      id: existing ? existing.id : Date.now().toString(),
       userId: currentUser!.id,
       sessionId,
       keyword,
       description,
-      likes: []
+      likes: existing?.likes || []
     };
 
     saveUserInsight(insight);
@@ -64,9 +73,9 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
   const classroomData = useMemo(() => {
     if (!classroomSessionId) return [];
     const sessionInsights = (db.userInsights || []).filter(i => i.sessionId === classroomSessionId);
-    
+
     const groups: Record<string, { count: number, originalKeywords: string[], insights: UserInsight[] }> = {};
-    
+
     sessionInsights.forEach(insight => {
       const repId = insight.canonicalId || insight.keyword;
       const term = db.canonicalTerms?.find(t => t.id === repId);
@@ -93,7 +102,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
   }, [db.userInsights, db.canonicalTerms, classroomSessionId]);
 
   const maxCount = useMemo(() => Math.max(...classroomData.map(d => d.count), 1), [classroomData]);
-  
+
   const aggregatedKeywords = useMemo(() => {
     if (!classroomSessionId) return [];
     const sessionInsights = (db.userInsights || []).filter(i => i.sessionId === classroomSessionId);
@@ -131,6 +140,64 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
       return (yiq >= 128) ? '#1c1c1c' : 'white';
     }
     return 'white';
+  };
+
+  // ── D3 bubble force simulation ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!classroomData.length || !bubbleContainerRef.current) return;
+
+    const W = bubbleContainerRef.current.clientWidth || 500;
+    const H = bubbleContainerRef.current.clientHeight || 400;
+
+    // Larger bubbles (higher count) = bigger radius → naturally cluster to center
+    const nodes: any[] = classroomData.map(d => ({
+      id: d.id,
+      r: 38 + (d.count / maxCount) * 58, // 38–96px radius
+      x: W / 2 + (Math.random() - 0.5) * 20,
+      y: H / 2 + (Math.random() - 0.5) * 20,
+    }));
+
+    const sim = d3.forceSimulation(nodes)
+      .force('center', d3.forceCenter(W / 2, H / 2).strength(0.8))
+      .force('collision', d3.forceCollide().radius((d: any) => d.r + 2).strength(1).iterations(6))
+      .force('x', d3.forceX(W / 2).strength(0.06))
+      .force('y', d3.forceY(H / 2).strength(0.06))
+      .alphaDecay(0.015)
+      .on('tick', () => {
+        const pos: Record<string, { x: number; y: number; r: number }> = {};
+        nodes.forEach((n: any) => { pos[n.id] = { x: n.x, y: n.y, r: n.r }; });
+        setBubblePositions({ ...pos });
+      });
+
+    return () => { sim.stop(); };
+  }, [classroomData, classroomSessionId, maxCount]);
+
+  // ── Bubble fullscreen ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = () => {
+      setIsBubbleFullScreen(!!(document.fullscreenElement || (document as any).webkitFullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handler);
+    document.addEventListener('webkitfullscreenchange', handler);
+    return () => {
+      document.removeEventListener('fullscreenchange', handler);
+      document.removeEventListener('webkitfullscreenchange', handler);
+    };
+  }, []);
+
+  const toggleBubbleFullScreen = () => {
+    const el = bubbleWrapRef.current as any;
+    if (!isBubbleFullScreen) {
+      try {
+        if (el?.requestFullscreen) el.requestFullscreen().catch(() => {});
+        else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      } catch {}
+    } else {
+      try {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen();
+      } catch {}
+    }
   };
 
   return (
@@ -177,7 +244,8 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
       <main className={`flex-1 overflow-y-auto px-4 sm:px-6 mx-auto transition-all ${adminCourseId ? 'max-w-none pt-8 pb-[env(safe-area-inset-bottom)]' : 'max-w-5xl pt-8 pb-[calc(6rem+env(safe-area-inset-bottom))]'}`}>
         <AnimatePresence mode="wait">
           {selectedSessionId ? (
-            <motion.div 
+            /* ── Input View ────────────────────────────────────────────────── */
+            <motion.div
               key="input"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -185,12 +253,22 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
               className="max-w-2xl mx-auto space-y-8"
             >
               <div className="space-y-2">
-                <button 
-                  onClick={() => setSelectedSessionId(null)}
-                  className="flex items-center gap-1 text-xs font-bold text-on-surface-variant hover:text-secondary transition-colors"
-                >
-                  <span className="material-symbols-outlined text-sm">arrow_back</span> 목록으로 돌아가기
-                </button>
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => setSelectedSessionId(null)}
+                    className="flex items-center gap-1 text-xs font-bold text-on-surface-variant hover:text-secondary transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">arrow_back</span> 목록으로 돌아가기
+                  </button>
+                  {/* Navigate to KEYWORD BUBBLE */}
+                  <button
+                    onClick={() => { setSelectedSessionId(null); setActiveTab('classroom'); }}
+                    className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/70 transition-colors bg-primary/5 border border-primary/20 px-3 py-1.5 rounded-full"
+                  >
+                    <span className="material-symbols-outlined text-sm">bubble_chart</span>
+                    KEYWORD BUBBLE 보기
+                  </button>
+                </div>
                 <h2 className="text-xl md:text-2xl font-headline font-bold text-on-surface break-keep">
                   {db.sessions.find(s => s.id === selectedSessionId)?.name}
                 </h2>
@@ -225,41 +303,55 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                 </div>
               </div>
 
-              <div className="space-y-6 bg-surface-container-low p-6 rounded-3xl border border-outline shadow-sm">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm">key</span> 핵심 키워드 (1개)
-                  </label>
-                  <input 
-                    type="text" 
-                    value={keyword}
-                    onChange={e => setKeyword(e.target.value)}
-                    placeholder="예: 생성형 AI 활용"
-                    className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm">description</span> 상세 설명
-                  </label>
-                  <textarea 
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    placeholder="학습한 내용과 인사이트를 자유롭게 적어주세요."
-                    rows={5}
-                    className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all resize-none"
-                  />
-                </div>
-                <button 
-                  onClick={() => handleSaveInsight(selectedSessionId)}
-                  className="w-full py-4 bg-secondary text-on-secondary font-headline font-bold rounded-xl shadow-lg active:scale-95 transition-all"
-                >
-                  인사이트 등록 완료
-                </button>
-              </div>
+              {/* Input Form */}
+              {(() => {
+                const isEditing = !!userInsights.find(i => i.sessionId === selectedSessionId);
+                return (
+                  <div className="space-y-6 bg-surface-container-low p-6 rounded-3xl border border-outline shadow-sm">
+                    {isEditing && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-secondary/10 border border-secondary/20 rounded-xl">
+                        <span className="material-symbols-outlined text-secondary text-sm">edit_note</span>
+                        <p className="text-xs font-bold text-secondary">이미 등록된 인사이트를 수정합니다.</p>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">key</span> 핵심 키워드 (1개)
+                      </label>
+                      <input
+                        type="text"
+                        value={keyword}
+                        onChange={e => setKeyword(e.target.value)}
+                        placeholder="예: 생성형 AI 활용"
+                        className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">description</span> 상세 설명
+                      </label>
+                      <textarea
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                        placeholder="학습한 내용과 인사이트를 자유롭게 적어주세요."
+                        rows={5}
+                        className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all resize-none"
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleSaveInsight(selectedSessionId)}
+                      className="w-full py-4 bg-secondary text-on-secondary font-headline font-bold rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-sm">{isEditing ? 'edit' : 'check_circle'}</span>
+                      {isEditing ? '수정 완료' : '인사이트 등록 완료'}
+                    </button>
+                  </div>
+                );
+              })()}
             </motion.div>
           ) : activeTab === 'my' ? (
-            <motion.div 
+            /* ── MY INSIGHT Tab ─────────────────────────────────────────────── */
+            <motion.div
               key="my"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -285,7 +377,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                   activeSessions.map((session, idx) => {
                     const insight = userInsights.find(i => i.sessionId === session.id);
                     return (
-                      <motion.div 
+                      <motion.div
                         key={session.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -300,14 +392,25 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                             </div>
                             <h2 className="text-lg font-headline font-black text-on-surface uppercase tracking-tight">{session.name}</h2>
                           </div>
-                          <button 
-                            onClick={() => startInput(session.id)}
-                            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${insight ? 'bg-secondary text-on-secondary shadow-md' : 'bg-surface-container-highest text-on-surface-variant hover:bg-secondary/20'}`}
-                          >
-                            <span className="material-symbols-outlined text-sm">{insight ? 'edit' : 'add'}</span>
-                          </button>
+                          {/* Edit / Add button */}
+                          {insight ? (
+                            <button
+                              onClick={() => startInput(session.id)}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-on-secondary text-xs font-bold shadow-md active:scale-95 transition-all"
+                            >
+                              <span className="material-symbols-outlined text-sm">edit</span>
+                              수정하기
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => startInput(session.id)}
+                              className="w-10 h-10 rounded-lg flex items-center justify-center bg-surface-container-highest text-on-surface-variant hover:bg-secondary/20 transition-all"
+                            >
+                              <span className="material-symbols-outlined text-sm">add</span>
+                            </button>
+                          )}
                         </div>
-                        
+
                         {insight ? (
                           <div className="space-y-3 pt-3 border-t border-outline/50">
                             <div className="flex items-center gap-2">
@@ -326,7 +429,8 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
               </div>
             </motion.div>
           ) : (
-            <motion.div 
+            /* ── CLASSROOM / BUBBLE CHART Tab ───────────────────────────────── */
+            <motion.div
               key="classroom"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -346,7 +450,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                     </p>
                   </div>
                   <div className="relative w-full md:w-72">
-                    <select 
+                    <select
                       value={classroomSessionId}
                       onChange={e => setClassroomSessionId(e.target.value)}
                       className="w-full bg-white border border-outline rounded-lg px-4 py-3 text-sm font-black text-primary outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer uppercase tracking-tight"
@@ -360,161 +464,174 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                 </div>
               </section>
 
-              {/* Bento Bubble Grid */}
-              <div className="grid grid-cols-12 gap-6 items-start">
-                {/* Stats Column */}
-                <div className="col-span-12 md:col-span-4 space-y-6">
-                  <div className="bg-surface-container-low p-6 md:p-8 rounded-xl border border-outline-variant/10">
-                    <h3 className="text-primary font-headline font-bold text-lg md:text-xl mb-6">Semantic Density</h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-on-surface-variant font-medium text-sm">Unique Keywords</span>
-                        <span className="text-primary font-bold text-lg">{classroomData.length}</span>
-                      </div>
-                      <div className="w-full bg-surface-variant h-1 rounded-full overflow-hidden">
-                        <div className="bg-secondary h-full" style={{ width: `${Math.min(100, (classroomData.length / 20) * 100)}%` }}></div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-on-surface-variant font-medium text-sm">Total Insights</span>
-                        <span className="text-primary font-bold text-lg">
-                          {classroomData.reduce((acc, curr) => acc + curr.count, 0)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-surface-variant h-1 rounded-full overflow-hidden">
-                        <div className="bg-secondary h-full" style={{ width: `${Math.min(100, (classroomData.reduce((acc, curr) => acc + curr.count, 0) / 50) * 100)}%` }}></div>
-                      </div>
+              <div className="space-y-6">
+
+                {/* ── 1. KEYWORD BUBBLE (first) ───────────────────────────── */}
+                <div
+                  ref={bubbleWrapRef}
+                  className={`bg-surface-container-low rounded-xl border border-outline-variant/10 relative overflow-hidden ${isBubbleFullScreen ? 'fixed inset-0 z-[9999] rounded-none' : ''}`}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-8 pt-8 pb-4">
+                    <div>
+                      <h3 className="text-primary font-headline font-bold text-lg md:text-xl">KEYWORD BUBBLE</h3>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5">버블을 탭하면 키워드를 확인할 수 있어요</p>
                     </div>
+                    <button
+                      onClick={toggleBubbleFullScreen}
+                      className="w-9 h-9 rounded-full bg-white/80 border border-outline flex items-center justify-center shadow-sm hover:bg-white transition-all text-on-surface-variant"
+                      title={isBubbleFullScreen ? '전체화면 나가기' : '전체화면'}
+                    >
+                      <span className="material-symbols-outlined text-lg">{isBubbleFullScreen ? 'fullscreen_exit' : 'fullscreen'}</span>
+                    </button>
+                  </div>
+
+                  {/* Bubble canvas */}
+                  <div
+                    ref={bubbleContainerRef}
+                    className={`relative w-full ${isBubbleFullScreen ? 'h-[calc(100vh-80px)]' : 'min-h-[420px]'} overflow-hidden`}
+                  >
+                    {classroomData.length === 0 ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/40 gap-3">
+                        <span className="material-symbols-outlined text-6xl">bubble_chart</span>
+                        <p className="font-headline font-bold">데이터가 부족합니다</p>
+                      </div>
+                    ) : (
+                      classroomData.map((data) => {
+                        const pos = bubblePositions[data.id];
+                        if (!pos) return null;
+                        const { x, y, r } = pos;
+                        const bgColor = getKeywordColor(data.name);
+                        const textColor = getContrastColor(bgColor);
+                        const isRevealed = revealedBubbles[classroomSessionId]?.has(data.id);
+                        const fontSize = Math.max(9, r * 0.2);
+                        const countFontSize = Math.max(8, r * 0.1);
+
+                        return (
+                          <motion.div
+                            key={data.id}
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                            whileHover={{ scale: 1.06 }}
+                            onClick={() => {
+                              if (!isRevealed) {
+                                // First click: reveal keyword
+                                setRevealedBubbles(prev => {
+                                  const sessionSet = new Set(prev[classroomSessionId] || []);
+                                  sessionSet.add(data.id);
+                                  return { ...prev, [classroomSessionId]: sessionSet };
+                                });
+                              } else {
+                                // Second click: open detail
+                                setSelectedKeywordDetail(data.id);
+                              }
+                            }}
+                            className="absolute rounded-full flex items-center justify-center cursor-pointer select-none shadow-lg transition-shadow hover:shadow-xl"
+                            style={{
+                              left: x - r,
+                              top: y - r,
+                              width: r * 2,
+                              height: r * 2,
+                              backgroundColor: bgColor,
+                            }}
+                          >
+                            {isRevealed ? (
+                              /* Revealed: show keyword + count */
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="text-center px-2"
+                                style={{ color: textColor }}
+                              >
+                                <span className="block font-headline font-black leading-tight" style={{ fontSize }}>{data.name}</span>
+                                <span className="block opacity-70 font-bold mt-0.5" style={{ fontSize: countFontSize }}>{data.count} Insights</span>
+                              </motion.div>
+                            ) : (
+                              /* Unrevealed: show only tap icon */
+                              <div className="flex flex-col items-center gap-0.5" style={{ color: textColor }}>
+                                <span
+                                  className="material-symbols-outlined opacity-60"
+                                  style={{ fontSize: Math.max(14, r * 0.35) }}
+                                >
+                                  touch_app
+                                </span>
+                              </div>
+                            )}
+                          </motion.div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="px-8 pb-6 pt-2 flex items-center gap-2 text-[10px] text-on-surface-variant/60">
+                    <span className="material-symbols-outlined text-xs">info</span>
+                    버블 크기 = 언급 빈도 · 탭 → 키워드 공개 · 재탭 → 상세 인사이트
                   </div>
                 </div>
 
-                {/* Main Content Column */}
-                <div className="col-span-12 md:col-span-8 space-y-6">
-                  {/* Best Insights Section (formerly Active Insight) */}
-                  <div className="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/10 shadow-sm">
-                    <h3 className="text-primary font-headline font-bold text-lg md:text-xl mb-6">BEST INSIGHTS</h3>
-                    
-                    <div className="space-y-8">
-                      {bestComments.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-8">
-                          {bestComments.map((comment, idx) => {
-                            const user = db.users.find(u => u.id === comment.userId);
-                            return (
-                              <div key={comment.id} className="relative">
-                                <span className="absolute -top-4 -left-2 text-6xl font-serif text-primary/10 select-none">“</span>
-                                <div className="pl-8 pr-4">
-                                  <p className="text-lg font-bold text-on-surface leading-snug italic mb-4 break-keep">
-                                    {comment.description}
-                                  </p>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[10px] font-black text-secondary uppercase tracking-widest">#{comment.keyword}</span>
-                                      <span className="text-[10px] text-on-surface-variant font-medium">
-                                        — {user ? `${user.company} | ${user.department} | ${user.name} | ${user.title}` : 'Anonymous'}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1 text-error">
-                                      <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
-                                      <span className="text-[10px] font-bold">{comment.likes?.length || 0}</span>
-                                    </div>
+                {/* ── 2. BEST INSIGHTS (second) ───────────────────────────── */}
+                <div className="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/10 shadow-sm">
+                  <h3 className="text-primary font-headline font-bold text-lg md:text-xl mb-6">BEST INSIGHTS</h3>
+
+                  <div className="space-y-8">
+                    {bestComments.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-8">
+                        {bestComments.map((comment, idx) => {
+                          const user = db.users.find(u => u.id === comment.userId);
+                          return (
+                            <div key={comment.id} className="relative">
+                              <span className="absolute -top-4 -left-2 text-6xl font-serif text-primary/10 select-none">"</span>
+                              <div className="pl-8 pr-4">
+                                <p className="text-lg font-bold text-on-surface leading-snug italic mb-4 break-keep">
+                                  {comment.description}
+                                </p>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-secondary uppercase tracking-widest">#{comment.keyword}</span>
+                                    <span className="text-[10px] text-on-surface-variant font-medium">
+                                      — {user ? `${user.company} | ${user.department} | ${user.name} | ${user.title}` : 'Anonymous'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-error">
+                                    <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+                                    <span className="text-[10px] font-bold">{comment.likes?.length || 0}</span>
                                   </div>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-on-surface leading-snug font-medium italic text-sm">
-                          {classroomData.length > 0 
-                            ? `"${classroomData[0].name}" 키워드가 이번 세션에서 가장 많은 공감을 얻고 있습니다.`
-                            : "아직 등록된 인사이트가 없습니다."}
-                        </p>
-                      )}
-                    </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-on-surface leading-snug font-medium italic text-sm">
+                        {classroomData.length > 0
+                          ? `"${classroomData[0].name}" 키워드가 이번 세션에서 가장 많은 공감을 얻고 있습니다.`
+                          : "아직 등록된 인사이트가 없습니다."}
+                      </p>
+                    )}
                   </div>
+                </div>
 
-                  {/* Bubble Chart Section */}
-                  <div className="bg-surface-container-low rounded-xl p-8 border border-outline-variant/10 relative overflow-hidden">
-                    <h3 className="text-primary font-headline font-bold text-lg md:text-xl mb-6">INSIGHT BUBBLE</h3>
-                    
-                    <div className="min-h-[500px] flex items-center justify-center relative">
-                      <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                      
-                      {classroomData.length === 0 ? (
-                        <div className="text-center space-y-4 opacity-40">
-                          <span className="material-symbols-outlined text-6xl">bubble_chart</span>
-                          <p className="font-headline font-bold">데이터가 부족합니다</p>
-                        </div>
-                      ) : (
-                        <div className="relative w-full h-full flex flex-wrap justify-center items-center gap-6 p-4">
-                          {classroomData.map((data) => {
-                            const size = 80 + (data.count / maxCount) * 120;
-                            const bgColor = getKeywordColor(data.name);
-                            const textColor = getContrastColor(bgColor);
-                            const isRevealed = revealedBubbles[classroomSessionId]?.has(data.id);
-    
-                            return (
-                              <motion.div
-                                key={data.name}
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                whileHover={{ scale: 1.05 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (!isRevealed) {
-                                    const next = { ...revealedBubbles };
-                                    const sessionSet = new Set(next[classroomSessionId] || []);
-                                    sessionSet.add(data.id);
-                                    next[classroomSessionId] = sessionSet;
-                                    setRevealedBubbles(next);
-                                  } else {
-                                    setSelectedKeywordDetail(data.id);
-                                  }
-                                }}
-                                className={`bubble-float rounded-full flex items-center justify-center shadow-xl cursor-pointer text-center p-4 transition-all duration-500 ${!isRevealed ? 'blur-md grayscale opacity-60 scale-95' : 'blur-0 grayscale-0 opacity-100 scale-100'}`}
-                                style={{ 
-                                  width: size, 
-                                  height: size,
-                                  backgroundColor: bgColor,
-                                  color: textColor
-                                }}
-                              >
-                                <div>
-                                  <span className="block font-headline font-black leading-tight" style={{ fontSize: size * 0.18 }}>{data.name}</span>
-                                  <span className="block opacity-80 font-bold mt-1" style={{ fontSize: size * 0.08 }}>{data.count} Insights</span>
-                                </div>
-                                {!isRevealed && (
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-white/50 text-2xl">lock</span>
-                                  </div>
-                                )}
-                              </motion.div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                {/* ── 3. Keyword Hashtag ──────────────────────────────────── */}
+                <div className="bg-surface-container-low p-5 rounded-xl border border-outline-variant/10 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-secondary text-sm">tag</span>
+                    <span className="text-on-surface-variant font-bold text-[10px] uppercase tracking-widest">Keyword Hashtag</span>
                   </div>
-
-                  {/* Keyword Hashtag Section */}
-                  <div className="bg-surface-container-low p-5 rounded-xl border border-outline-variant/10 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="material-symbols-outlined text-secondary text-sm">tag</span>
-                      <span className="text-on-surface-variant font-bold text-[10px] uppercase tracking-widest">Keyword Hashtag</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto scrollbar-hide pr-2">
-                      {aggregatedKeywords.length === 0 ? (
-                        <p className="text-xs text-on-surface-variant/50 italic">등록된 키워드가 없습니다.</p>
-                      ) : (
-                        aggregatedKeywords.map(({ keyword, count }) => (
-                          <span 
-                            key={keyword} 
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-container-highest text-secondary text-[11px] font-bold border border-outline-variant/20 hover:bg-secondary/10 transition-colors"
-                          >
-                            #{keyword}{count > 1 ? `(${count})` : ''}
-                          </span>
-                        ))
-                      )}
-                    </div>
+                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto scrollbar-hide pr-2">
+                    {aggregatedKeywords.length === 0 ? (
+                      <p className="text-xs text-on-surface-variant/50 italic">등록된 키워드가 없습니다.</p>
+                    ) : (
+                      aggregatedKeywords.map(({ keyword, count }) => (
+                        <span
+                          key={keyword}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-container-highest text-secondary text-[11px] font-bold border border-outline-variant/20 hover:bg-secondary/10 transition-colors"
+                        >
+                          #{keyword}{count > 1 ? `(${count})` : ''}
+                        </span>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -551,14 +668,14 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
         <AnimatePresence>
           {selectedKeywordDetail && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setSelectedKeywordDetail(null)}
                 className="absolute inset-0 bg-on-background/60 backdrop-blur-sm"
               />
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -575,7 +692,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                       ))}
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setSelectedKeywordDetail(null)}
                     className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-highest transition-colors"
                   >
@@ -589,7 +706,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                     .map((insight) => {
                       const user = db.users.find(u => u.id === insight.userId);
                       const isLiked = insight.likes?.includes(currentUser?.id || '');
-                    
+
                     return (
                       <div key={insight.id} className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/10 space-y-4 shadow-sm">
                         <div className="flex justify-between items-start">
@@ -612,7 +729,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                               </p>
                             </div>
                           </div>
-                          <button 
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               if (currentUser) toggleInsightLike(insight.id, currentUser.id);
@@ -639,16 +756,16 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
       {/* Bottom Nav - Hidden in Admin Mode */}
       {!adminCourseId && (
         <nav className="z-50 flex justify-around items-center h-[calc(3.5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] px-4 bg-surface/90 backdrop-blur-2xl border-t border-outline shadow-lg shrink-0">
-          <button 
-            onClick={() => setActiveTab('my')}
-            className={`flex items-center justify-center gap-2 transition-colors active:scale-95 px-4 py-2 rounded-full ${activeTab === 'my' ? 'text-secondary bg-secondary/10' : 'text-on-surface-variant/40 hover:text-secondary'}`}
+          <button
+            onClick={() => { setSelectedSessionId(null); setActiveTab('my'); }}
+            className={`flex items-center justify-center gap-2 transition-colors active:scale-95 px-4 py-2 rounded-full ${activeTab === 'my' && !selectedSessionId ? 'text-secondary bg-secondary/10' : 'text-on-surface-variant/40 hover:text-secondary'}`}
           >
             <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: activeTab === 'my' ? "'FILL' 1" : "'FILL' 0" }}>psychology</span>
             <span className="font-label text-[10px] uppercase tracking-widest font-medium">My Insight</span>
           </button>
-          
-          <button 
-            onClick={() => setActiveTab('classroom')}
+
+          <button
+            onClick={() => { setSelectedSessionId(null); setActiveTab('classroom'); }}
             className={`flex items-center justify-center gap-2 transition-colors active:scale-95 px-4 py-2 rounded-full ${activeTab === 'classroom' ? 'text-secondary bg-secondary/10' : 'text-on-surface-variant/40 hover:text-secondary'}`}
           >
             <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: activeTab === 'classroom' ? "'FILL' 1" : "'FILL' 0" }}>bubble_chart</span>
