@@ -145,26 +145,28 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
 
   return (
     <div className="absolute inset-0 flex flex-col bg-background text-on-surface">
-      <header className="shrink-0 z-50 flex justify-between items-center px-6 h-16 bg-surface/80 backdrop-blur-xl border-b border-outline shadow-sm">
-        <div className="flex items-center gap-3">
-          {showBack && (
-            <button onClick={onSave} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-highest transition-colors">
-              <span className="material-symbols-outlined text-on-surface-variant">arrow_back</span>
-            </button>
-          )}
-          <span className="font-headline text-lg font-bold tracking-tight text-primary">내 프로필 설정</span>
-        </div>
-        {onLogout && (
-          <div className="bg-surface-container-low border border-outline rounded-xl p-1 flex items-center shadow-sm">
-            <button 
-              onClick={onLogout}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors"
-              title="로그아웃"
-            >
-              <span className="material-symbols-outlined text-xl">logout</span>
-            </button>
+      <header className="header-safe shrink-0 z-50 bg-surface/80 backdrop-blur-xl border-b border-outline shadow-sm">
+        <div className="h-14 flex justify-between items-center px-6">
+          <div className="flex items-center gap-3">
+            {showBack && (
+              <button onClick={onSave} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-highest transition-colors">
+                <span className="material-symbols-outlined text-on-surface-variant">arrow_back</span>
+              </button>
+            )}
+            <span className="font-headline text-lg font-bold tracking-tight text-primary">내 프로필 설정</span>
           </div>
-        )}
+          {onLogout && (
+            <div className="bg-surface-container-low border border-outline rounded-xl p-1 flex items-center shadow-sm">
+              <button
+                onClick={onLogout}
+                className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors"
+                title="로그아웃"
+              >
+                <span className="material-symbols-outlined text-xl">logout</span>
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto pt-8 pb-32 max-w-2xl mx-auto px-4 sm:px-6 space-y-10 w-full">

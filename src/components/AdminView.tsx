@@ -699,7 +699,8 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
 
   return (
     <div className="absolute inset-0 bg-background text-on-surface flex flex-col overflow-hidden">
-      <header className="w-full z-50 flex justify-between items-center px-4 sm:px-6 h-16 bg-primary shadow-lg shrink-0">
+      <header className="header-safe w-full z-50 bg-primary shadow-lg shrink-0">
+        <div className="h-16 flex justify-between items-center px-4 sm:px-6">
         <div className="flex items-center gap-3 sm:gap-8 flex-1 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <span className="material-symbols-outlined text-white">hub</span>
@@ -734,7 +735,7 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
           </nav>
         </div>
         <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1 flex items-center gap-2 shadow-sm shrink-0 ml-2">
-          <button 
+          <button
             onClick={onLogout}
             className="flex items-center gap-2 text-white/70 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
           >
@@ -742,6 +743,7 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
             <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">Logout</span>
           </button>
         </div>
+        </div> {/* h-16 inner div 닫기 */}
       </header>
 
       {/* Status Message */}

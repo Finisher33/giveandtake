@@ -78,16 +78,18 @@ export default function MainView({ onAdminClick }: { onAdminClick: () => void })
 
   return (
     <div className="absolute inset-0 flex flex-col bg-background overflow-hidden">
-      <header className="flex items-center justify-between px-6 py-4 w-full z-50 bg-surface border-b border-outline shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-primary">hub</span>
+      <header className="header-safe bg-surface border-b border-outline shrink-0 z-50">
+        <div className="flex items-center justify-between px-6 h-14">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">hub</span>
+          </div>
+          <button
+            onClick={onAdminClick}
+            className="text-xs font-bold text-primary border border-primary/30 px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-colors"
+          >
+            Admin
+          </button>
         </div>
-        <button 
-          onClick={onAdminClick}
-          className="text-xs font-bold text-primary border border-primary/30 px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-colors"
-        >
-          Admin
-        </button>
       </header>
 
       <main className="flex-1 overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
