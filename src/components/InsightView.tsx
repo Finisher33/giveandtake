@@ -134,7 +134,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
   };
 
   return (
-    <div className="h-[100dvh] bg-background text-on-surface flex flex-col overflow-hidden">
+    <div className="absolute inset-0 bg-background text-on-surface flex flex-col overflow-hidden">
       {/* Top Nav - Hidden in Admin Mode */}
       {!adminCourseId && (
         <header className="bg-white/80 backdrop-blur-xl border-b border-outline flex justify-between items-center px-4 h-12 shadow-sm shrink-0 z-50">

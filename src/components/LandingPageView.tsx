@@ -13,7 +13,7 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
   const { currentUser } = useStore();
 
   return (
-    <div className="h-full bg-background text-on-surface flex flex-col overflow-hidden">
+    <div className="absolute inset-0 bg-background text-on-surface flex flex-col overflow-hidden">
       {/* Top Bar */}
       <header className="h-12 bg-white/80 backdrop-blur-md border-b border-outline flex justify-end items-center px-4 z-50 shadow-sm shrink-0">
         <div className="flex items-center gap-1">

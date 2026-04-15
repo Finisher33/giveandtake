@@ -144,7 +144,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
   };
 
   return (
-    <div className="h-full flex flex-col bg-background text-on-surface">
+    <div className="absolute inset-0 flex flex-col bg-background text-on-surface">
       <header className="shrink-0 z-50 flex justify-between items-center px-6 h-16 bg-surface/80 backdrop-blur-xl border-b border-outline shadow-sm">
         <div className="flex items-center gap-3">
           {showBack && (

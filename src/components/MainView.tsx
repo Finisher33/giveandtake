@@ -77,7 +77,7 @@ export default function MainView({ onAdminClick }: { onAdminClick: () => void })
   };
 
   return (
-    <div className="h-full flex flex-col bg-background overflow-hidden">
+    <div className="absolute inset-0 flex flex-col bg-background overflow-hidden">
       <header className="flex items-center justify-between px-6 py-4 w-full z-50 bg-surface border-b border-outline shrink-0">
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-primary">hub</span>

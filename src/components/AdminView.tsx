@@ -698,7 +698,7 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
   }
 
   return (
-    <div className="h-full bg-background text-on-surface flex flex-col overflow-hidden">
+    <div className="absolute inset-0 bg-background text-on-surface flex flex-col overflow-hidden">
       <header className="w-full z-50 flex justify-between items-center px-4 sm:px-6 h-16 bg-primary shadow-lg shrink-0">
         <div className="flex items-center gap-3 sm:gap-8 flex-1 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
