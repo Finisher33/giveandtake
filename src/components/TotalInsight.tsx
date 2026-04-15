@@ -3,6 +3,117 @@ import { useStore, UserInsight } from '../store';
 import { motion, AnimatePresence } from 'motion/react';
 import { summarizeInsights } from '../services/geminiService';
 
+// 버블 컬러 팔레트 - 각 버블마다 다른 색상 적용
+const BUBBLE_PALETTE = [
+  { light: ['#ff9a9e', '#ff6b9d', '#c44569'], dark: ['#c44569', '#8e2040', '#5a0e28'], text: '#fff' },
+  { light: ['#ffecd2', '#fcb69f', '#e8825c'], dark: ['#e8825c', '#b85a38', '#7a3520'], text: '#fff' },
+  { light: ['#a8edea', '#6ec6c4', '#3aafa9'], dark: ['#3aafa9', '#1f7a76', '#0d4f4c'], text: '#fff' },
+  { light: ['#c2e9fb', '#81c8f5', '#4facde'], dark: ['#4facde', '#2778b0', '#0e4d80'], text: '#fff' },
+  { light: ['#d4fc79', '#a8e063', '#6abf4b'], dark: ['#6abf4b', '#3e8c2a', '#205e14'], text: '#fff' },
+  { light: ['#e0c3fc', '#c084fc', '#9333ea'], dark: ['#9333ea', '#6b21a8', '#4a0e7a'], text: '#fff' },
+  { light: ['#fbc2eb', '#f472b6', '#db2777'], dark: ['#db2777', '#9d174d', '#6b0f35'], text: '#fff' },
+  { light: ['#ffd89b', '#f9b95c', '#f09320'], dark: ['#f09320', '#b86a0a', '#7a4300'], text: '#fff' },
+  { light: ['#a1c4fd', '#6fa3fb', '#3b82f6'], dark: ['#3b82f6', '#1d4ed8', '#1e3a8a'], text: '#fff' },
+  { light: ['#84fab0', '#4dd98a', '#22c55e'], dark: ['#22c55e', '#15803d', '#0d5028'], text: '#fff' },
+];
+
+interface BubbleItem { id: string; keyword: string; count: number; }
+
+function BubbleChart({ items, selectedId, onSelect }: {
+  items: BubbleItem[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(600);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    setContainerWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+
+  if (items.length === 0) return null;
+
+  const maxCount = Math.max(...items.map(s => s.count));
+  const minCount = Math.min(...items.map(s => s.count));
+  const range = maxCount - minCount || 1;
+
+  // 컨테이너 너비 기준으로 버블 크기 계산 (모바일/데스크탑 모두 대응)
+  const maxSize = Math.min(containerWidth * 0.32, 180);
+  const minSize = Math.max(containerWidth * 0.12, 64);
+
+  return (
+    <div ref={containerRef} className="w-full min-h-[320px] sm:min-h-[420px] flex flex-wrap items-center justify-center gap-3 sm:gap-5 py-4">
+      {items.map((item, idx) => {
+        const palette = BUBBLE_PALETTE[idx % BUBBLE_PALETTE.length];
+        const t = (item.count - minCount) / range;
+        const size = minSize + t * (maxSize - minSize);
+        const isSelected = selectedId === item.id;
+
+        const bg = isSelected
+          ? `radial-gradient(circle at 38% 32%, ${palette.dark[0]} 0%, ${palette.dark[1]} 55%, ${palette.dark[2]} 100%)`
+          : `radial-gradient(circle at 38% 32%, ${palette.light[0]} 0%, ${palette.light[1]} 45%, ${palette.light[2]} 100%)`;
+
+        const shadow = isSelected
+          ? `inset -3px -4px 10px rgba(0,0,0,0.3), inset 3px 3px 8px rgba(255,255,255,0.15), 4px 8px 20px rgba(0,0,0,0.4)`
+          : `inset -3px -4px 10px rgba(0,0,0,0.1), inset 3px 3px 8px rgba(255,255,255,0.85), 4px 8px 20px rgba(0,0,0,0.2)`;
+
+        const fontSize = Math.max(size * 0.085, 9);
+        const countSize = Math.max(size * 0.065, 8);
+
+        return (
+          <motion.button
+            key={item.id}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', damping: 14, stiffness: 200, delay: idx * 0.04 }}
+            onClick={() => onSelect(item.id)}
+            style={{
+              width: size,
+              height: size,
+              background: bg,
+              boxShadow: shadow,
+              border: isSelected
+                ? '2px solid rgba(255,255,255,0.2)'
+                : `2px solid ${palette.light[1]}55`,
+              flexShrink: 0,
+            }}
+            className={`rounded-full flex flex-col items-center justify-center transition-transform active:scale-95 ${
+              isSelected ? 'scale-110 z-10' : 'hover:scale-105'
+            }`}
+          >
+            <span style={{ fontSize: countSize, color: 'rgba(255,255,255,0.5)', fontWeight: 900, lineHeight: 1 }}>
+              {(idx + 1).toString().padStart(2, '0')}
+            </span>
+            <span style={{ fontSize, color: palette.text, fontWeight: 900, lineHeight: 1.1, textAlign: 'center', padding: '0 12%', wordBreak: 'break-all' }}>
+              #{item.keyword}
+            </span>
+            <span style={{
+              fontSize: countSize,
+              color: palette.text,
+              fontWeight: 900,
+              background: 'rgba(0,0,0,0.18)',
+              borderRadius: 99,
+              padding: '1px 6px',
+              marginTop: 3,
+            }}>
+              {item.count}
+            </span>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
 interface TotalInsightProps {
   courseId: string;
 }
@@ -651,49 +762,13 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
               <div className="p-6 bg-surface-container-low border-b border-outline">
                 <h3 className="text-xl font-black uppercase tracking-tight text-primary">Integrated Keywords</h3>
               </div>
-              <div className={`p-12 transition-all duration-1000 ${!isKeywordRevealed ? 'blur-2xl grayscale opacity-20 pointer-events-none' : ''}`}>
-                {/* Bubble Chart Implementation */}
-                <div className="flex flex-wrap items-center justify-center gap-6 min-h-[400px]">
-                  {sessionStats.top10.map((item, idx) => {
-                    const maxCount = Math.max(...sessionStats.top10.map(s => s.count));
-                    const minCount = Math.min(...sessionStats.top10.map(s => s.count));
-                    const range = maxCount - minCount || 1;
-                    // Size from 80px to 200px
-                    const size = 80 + ((item.count - minCount) / range) * 120;
-                    
-                    return (
-                      <motion.button
-                        key={item.id}
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', damping: 12, delay: idx * 0.05 }}
-                        onClick={() => setSelectedKeywordForPopup(item.id)}
-                        style={{
-                          width: size,
-                          height: size,
-                          background: selectedTopKeyword === item.id
-                            ? 'radial-gradient(circle at 38% 35%, #2a5ca8 0%, #002C5F 55%, #001530 100%)'
-                            : 'radial-gradient(circle at 38% 35%, #ffffff 0%, #daeeff 40%, #aad4f5 80%, #88bbec 100%)',
-                          boxShadow: selectedTopKeyword === item.id
-                            ? 'inset -4px -4px 10px rgba(0,0,0,0.35), inset 3px 3px 8px rgba(255,255,255,0.12), 5px 10px 24px rgba(0,44,95,0.45)'
-                            : 'inset -4px -4px 10px rgba(0,0,0,0.12), inset 3px 3px 8px rgba(255,255,255,0.9), 5px 10px 24px rgba(0,0,0,0.18)',
-                          border: selectedTopKeyword === item.id ? '2px solid rgba(255,255,255,0.15)' : '2px solid rgba(100,180,255,0.4)',
-                        }}
-                        className={`rounded-full flex flex-col items-center justify-center p-4 transition-all ${
-                          selectedTopKeyword === item.id
-                            ? 'text-white scale-110 z-10'
-                            : 'text-[#2a5ca8] hover:scale-105'
-                        }`}
-                      >
-                        <span className="text-[10px] font-black opacity-40 mb-1">{(idx + 1).toString().padStart(2, '0')}</span>
-                        <span className="text-sm font-black uppercase tracking-tighter text-center leading-none mb-2">#{item.keyword}</span>
-                        <span className={`text-[10px] font-black tabular-nums px-2 py-0.5 rounded-full ${selectedTopKeyword === item.id ? 'bg-white/20' : 'bg-surface-container-low'}`}>
-                          {item.count}
-                        </span>
-                      </motion.button>
-                    );
-                  })}
-                </div>
+              <div className={`p-6 sm:p-10 transition-all duration-1000 ${!isKeywordRevealed ? 'blur-2xl grayscale opacity-20 pointer-events-none' : ''}`}>
+                {/* Responsive Bubble Chart */}
+                <BubbleChart
+                  items={sessionStats.top10}
+                  selectedId={selectedTopKeyword}
+                  onSelect={(id) => setSelectedKeywordForPopup(id)}
+                />
               </div>
 
               {!isKeywordRevealed && (

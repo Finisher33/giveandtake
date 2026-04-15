@@ -6,7 +6,7 @@ export default function LibraryView() {
   const { db, currentUser, sendTeaTimeRequest } = useStore();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'giver' | 'taker'>('all');
+  const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
 
   const courseUsers = useMemo(() =>
     db.users.filter(u => u.courseId === currentUser?.courseId),
@@ -17,6 +17,30 @@ export default function LibraryView() {
     db.interests.filter(i => i.userId === currentUser?.id),
     [db.interests, currentUser]
   );
+
+  // 과정 참여자 전체 키워드 목록 (중복 제거, 빈도순 정렬)
+  const allKeywords = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const courseUserIds = new Set(courseUsers.map(u => u.id));
+    db.interests
+      .filter((i: Interest) => courseUserIds.has(i.userId))
+      .forEach((i: Interest) => {
+        const kw = i.keyword.trim();
+        if (kw) counts[kw] = (counts[kw] || 0) + 1;
+      });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([keyword, count]) => ({ keyword, count }));
+  }, [courseUsers, db.interests]);
+
+  const toggleKeyword = (keyword: string) => {
+    setSelectedKeywords(prev => {
+      const next = new Set(prev);
+      if (next.has(keyword)) next.delete(keyword);
+      else next.add(keyword);
+      return next;
+    });
+  };
 
   const filteredUsers = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -32,13 +56,18 @@ export default function LibraryView() {
           );
         if (!matches) return false;
       }
-      if (filterType !== 'all') {
-        const hasType = db.interests.some((i: Interest) => i.userId === u.id && i.type === filterType);
-        if (!hasType) return false;
+      if (selectedKeywords.size > 0) {
+        const userKeywords = new Set(
+          db.interests
+            .filter((i: Interest) => i.userId === u.id)
+            .map((i: Interest) => i.keyword.trim())
+        );
+        const hasAll = [...selectedKeywords].every(kw => userKeywords.has(kw));
+        if (!hasAll) return false;
       }
       return true;
     });
-  }, [courseUsers, search, filterType, db.interests]);
+  }, [courseUsers, search, selectedKeywords, db.interests]);
 
   const handleSend = (toUserId: string, message: string) => {
     sendTeaTimeRequest({
@@ -62,46 +91,66 @@ export default function LibraryView() {
         </p>
       </div>
 
-      {/* Search & Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="이름, 소속, 키워드로 검색..."
-            className="w-full pl-9 pr-4 py-2.5 bg-surface border border-outline rounded-xl text-sm outline-none focus:border-primary"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface">
-              <span className="material-symbols-outlined text-lg">close</span>
-            </button>
-          )}
-        </div>
-        <div className="flex gap-2 shrink-0">
-          {(['all', 'giver', 'taker'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilterType(f)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
-                filterType === f
-                  ? f === 'giver' ? 'bg-primary text-on-primary border-primary'
-                    : f === 'taker' ? 'bg-secondary text-on-secondary border-secondary'
-                    : 'bg-on-surface text-surface border-on-surface'
-                  : 'bg-surface text-on-surface-variant border-outline hover:border-on-surface-variant'
-              }`}
-            >
-              {f === 'all' ? '전체' : f === 'giver' ? 'Giver' : 'Taker'}
-            </button>
-          ))}
-        </div>
+      {/* Search */}
+      <div className="relative">
+        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="이름, 소속, 키워드로 검색..."
+          className="w-full pl-9 pr-4 py-2.5 bg-surface border border-outline rounded-xl text-sm outline-none focus:border-primary"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        )}
       </div>
 
+      {/* Keyword Hashtag Filter */}
+      {allKeywords.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">키워드로 필터</p>
+            {selectedKeywords.size > 0 && (
+              <button
+                onClick={() => setSelectedKeywords(new Set())}
+                className="text-[10px] font-bold text-primary hover:underline"
+              >
+                초기화
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {allKeywords.map(({ keyword, count }) => {
+              const active = selectedKeywords.has(keyword);
+              return (
+                <button
+                  key={keyword}
+                  onClick={() => toggleKeyword(keyword)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                    active
+                      ? 'bg-primary text-on-primary border-primary shadow-sm'
+                      : 'bg-surface text-on-surface-variant border-outline hover:border-primary/50 hover:text-primary'
+                  }`}
+                >
+                  <span>#{keyword}</span>
+                  <span className={`text-[9px] ${active ? 'text-on-primary/70' : 'text-on-surface-variant/60'}`}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Result count */}
-      {(search || filterType !== 'all') && (
+      {(search || selectedKeywords.size > 0) && (
         <p className="text-xs text-on-surface-variant">
           검색 결과 <span className="font-bold text-primary">{filteredUsers.length}</span>명
+          {selectedKeywords.size > 0 && (
+            <span className="ml-1">· 선택된 키워드 {selectedKeywords.size}개</span>
+          )}
         </p>
       )}
 
