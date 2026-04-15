@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { getEmbedding, cosineSimilarity } from './services/embeddingService';
-import { db as firestore, auth } from './firebase';
+import { db as firestore, auth, authReady } from './firebase';
 import { doc, onSnapshot, setDoc, getDoc, getDocFromServer, collection, deleteDoc, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { generateMockData } from './utils/mockData';
 
@@ -328,6 +328,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     // 마이그레이션 및 초기화 로직 (Migration and Initialization)
     const initializeData = async () => {
+      await authReady; // Firebase 익명 인증 완료 후 Firestore 접근
       try {
         const oldDocRef = doc(firestore, 'giveandtake', 'data');
         const oldSnap = await getDoc(oldDocRef);

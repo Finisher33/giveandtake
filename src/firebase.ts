@@ -1,21 +1,27 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Firebase 앱 초기화 (Initialize Firebase)
 const app = initializeApp(firebaseConfig);
 
-// Firestore 데이터베이스 인스턴스 생성 (Initialize Firestore)
-// firebase-applet-config.json에 정의된 firestoreDatabaseId가 있으면 사용하고, 없으면 기본값을 사용합니다.
 export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || '(default)');
-
-// Firebase 인증 서비스 생성 (Initialize Firebase Auth)
 export const auth = getAuth(app);
-
-// Google 인증 프로바이더 설정 (Google Auth Provider)
 export const googleProvider = new GoogleAuthProvider();
-
-// Analytics 초기화 (Initialize Analytics - Browser only)
 export const analytics = isSupported().then(yes => yes ? getAnalytics(app) : null);
+
+// Firestore 규칙의 isAuthenticated() 조건을 충족하기 위해 익명 로그인 수행
+// 앱 사용자 인증(이름/회사 기반)과는 별개로 Firestore 접근 권한 확보용
+export const authReady = new Promise<void>((resolve) => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (user) {
+      unsubscribe();
+      resolve();
+    }
+  });
+  signInAnonymously(auth).catch((err) => {
+    console.error('익명 인증 실패:', err);
+    resolve(); // 실패해도 앱은 계속 동작
+  });
+});
