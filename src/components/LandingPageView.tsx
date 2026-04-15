@@ -45,7 +45,7 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto px-6 scrollbar-hide">
+      <main className="flex-1 overflow-y-auto px-6 scrollbar-hide pb-[env(safe-area-inset-bottom)]">
         <div className="min-h-full flex flex-col">
           <div className="my-auto w-full flex flex-col items-center py-12">
             <motion.div 

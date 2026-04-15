@@ -90,7 +90,7 @@ export default function MainView({ onAdminClick }: { onAdminClick: () => void })
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <div className="min-h-full flex flex-col">
           <div className="my-auto w-full max-w-xl mx-auto space-y-10 py-8">
           <div className="text-center space-y-3">

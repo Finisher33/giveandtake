@@ -172,7 +172,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
         </header>
       )}
 
-      <main className={`flex-1 overflow-y-auto px-6 mx-auto transition-all ${adminCourseId ? 'max-w-none pt-8' : 'max-w-5xl pt-8 pb-24'}`}>
+      <main className={`flex-1 overflow-y-auto px-4 sm:px-6 mx-auto transition-all ${adminCourseId ? 'max-w-none pt-8 pb-[env(safe-area-inset-bottom)]' : 'max-w-5xl pt-8 pb-[calc(6rem+env(safe-area-inset-bottom))]'}`}>
         <AnimatePresence mode="wait">
           {selectedSessionId ? (
             <motion.div 

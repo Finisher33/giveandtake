@@ -465,7 +465,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
       </main>
 
       {/* 하단 고정 저장 버튼 */}
-      <div className="shrink-0 px-4 sm:px-6 py-3 bg-white/90 backdrop-blur-md border-t border-outline shadow-lg pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <div className="shrink-0 px-4 sm:px-6 pt-3 bg-white/90 backdrop-blur-md border-t border-outline shadow-lg" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
         <div className="max-w-2xl mx-auto w-full">
           <button
             onClick={handleSave}

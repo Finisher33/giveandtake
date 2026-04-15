@@ -34,7 +34,7 @@ export default function App() {
   // 데이터 로딩 중일 때 표시할 로딩 화면
   if (!isDbLoaded) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+      <div className="h-full flex flex-col items-center justify-center bg-background">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-primary font-bold animate-pulse">데이터를 불러오는 중입니다...</p>
       </div>
@@ -99,7 +99,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-background overflow-hidden">
+    <div className="h-full flex flex-col bg-background overflow-hidden">
       {renderContent()}
     </div>
   );

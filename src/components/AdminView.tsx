@@ -756,7 +756,7 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
         </div>
       )}
 
-      <main className={`flex-1 overflow-y-auto pb-20 pt-8 px-4 md:px-8 mx-auto transition-all duration-500 ${adminSubView === 'analysis' || adminSubView === 'users' ? 'max-w-[98%]' : 'max-w-5xl'}`}>
+      <main className={`flex-1 overflow-y-auto pt-8 px-4 md:px-8 mx-auto transition-all duration-500 pb-[calc(5rem+env(safe-area-inset-bottom))] ${adminSubView === 'analysis' || adminSubView === 'users' ? 'max-w-[98%]' : 'max-w-5xl'}`}>
         {adminSubView === 'management' ? (
           <div className="space-y-12">
             <div>

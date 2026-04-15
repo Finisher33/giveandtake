@@ -25,7 +25,7 @@ export default function AppView({
   const setActiveTab = onTabChange || (() => {});
 
   return (
-    <div className="h-[100dvh] bg-background text-on-surface flex flex-col overflow-hidden">
+    <div className="h-full bg-background text-on-surface flex flex-col overflow-hidden">
       {/* Top Nav */}
       <header className="bg-white border-b border-outline flex justify-between items-center px-4 h-12 shadow-sm shrink-0 z-[100]">
         <div className="flex items-center gap-2">
