@@ -226,6 +226,96 @@ function PartnerMatchSection({
   );
 }
 
+// ─── 티타임 미션 전용 모달 ────────────────────────────────────────────────────
+
+function TeaTimeMissionModal({
+  targetUser,
+  myInterests,
+  onSend,
+  onClose,
+}: {
+  targetUser: User;
+  myInterests: Interest[];
+  onSend: (message: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [msg, setMsg] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    if (!msg.trim()) { alert('메시지를 입력해주세요.'); return; }
+    setSending(true);
+    try {
+      const hashtags = myInterests.map(i => `#${i.keyword}`).join(' ');
+      await onSend(hashtags ? `${hashtags}\n\n${msg}` : msg);
+      onClose();
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-outline"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* 상대방 프로필 */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center border border-outline bg-surface-container-low shrink-0">
+            {isUrl(targetUser.profilePic)
+              ? <img src={targetUser.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              : <span className="font-bold text-primary text-sm">{targetUser.name.charAt(0)}</span>}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-on-surface-variant truncate uppercase font-medium">
+              {targetUser.company}{targetUser.department ? ` · ${targetUser.department}` : ''}
+            </p>
+            <p className="font-bold text-on-surface text-sm">{targetUser.name}</p>
+            <p className="text-[10px] text-primary font-medium truncate">{targetUser.title}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-highest shrink-0">
+            <span className="material-symbols-outlined text-on-surface-variant text-lg">close</span>
+          </button>
+        </div>
+
+        {/* 티타임 요청 폼 */}
+        <div className="space-y-3">
+          <p className="text-[10px] font-bold text-on-surface uppercase tracking-widest">티타임 요청</p>
+          {myInterests.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {myInterests.map(i => (
+                <span key={i.id} className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-md border border-primary/20">
+                  #{i.keyword}
+                </span>
+              ))}
+            </div>
+          )}
+          <textarea
+            value={msg}
+            onChange={e => setMsg(e.target.value)}
+            placeholder={`${targetUser.name}님에게 보낼 메시지를 작성하세요...`}
+            rows={4}
+            className="w-full bg-surface-container-low border border-outline rounded-xl p-3 text-sm resize-none outline-none focus:border-primary"
+          />
+          <button
+            onClick={handleSend}
+            disabled={sending}
+            className="w-full py-3 bg-primary text-on-primary font-bold rounded-xl shadow-lg active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {sending
+              ? <><span className="material-symbols-outlined text-base animate-spin">sync</span> 전송 중...</>
+              : '요청 보내기'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── 티타임 추천 리더 카드 ────────────────────────────────────────────────────
 
 function TeaTimeUserCard({
@@ -234,7 +324,6 @@ function TeaTimeUserCard({
   myKws,
   matchType,
   requested,
-  requesting,
   onRequest,
   index,
 }: {
@@ -243,7 +332,6 @@ function TeaTimeUserCard({
   myKws: Set<string>;
   matchType: 'keyword' | 'location';
   requested: boolean;
-  requesting: boolean;
   onRequest: () => void;
   index: number;
 }) {
@@ -290,16 +378,15 @@ function TeaTimeUserCard({
       </div>
 
       {requested ? (
-        <span className="shrink-0 text-[10px] font-black px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface-variant border border-outline/40 whitespace-nowrap">
+        <span className="shrink-0 text-[10px] font-black px-3 py-1.5 rounded-lg bg-green-500/10 text-green-600 border border-green-500/25 whitespace-nowrap">
           요청완료
         </span>
       ) : (
         <button
           onClick={onRequest}
-          disabled={requesting}
-          className="shrink-0 text-[10px] font-black px-3 py-1.5 rounded-lg bg-secondary text-on-secondary hover:bg-secondary/90 active:scale-95 transition-all disabled:opacity-50 whitespace-nowrap"
+          className="shrink-0 text-[10px] font-black px-3 py-1.5 rounded-lg bg-secondary text-on-secondary hover:bg-secondary/90 active:scale-95 transition-all whitespace-nowrap"
         >
-          {requesting ? '...' : '티타임 요청'}
+          티타임 요청
         </button>
       )}
     </motion.div>
@@ -319,13 +406,18 @@ function TeaTimeMissionSection({
   courseUsers: User[];
   allInterests: Interest[];
   teaTimeRequests: TeaTimeRequest[];
-  onRequest: (toUser: User) => Promise<void>;
+  onRequest: (toUser: User, message: string) => Promise<void>;
 }) {
-  const [requestingIds, setRequestingIds] = useState<Set<string>>(new Set());
+  const [modalUser, setModalUser] = useState<User | null>(null);
+
+  const myInterests = useMemo(
+    () => allInterests.filter(i => i.userId === currentUser.id),
+    [allInterests, currentUser.id]
+  );
 
   const myKws = useMemo(
-    () => new Set(allInterests.filter(i => i.userId === currentUser.id).map(i => i.keyword.toLowerCase().trim())),
-    [allInterests, currentUser.id]
+    () => new Set(myInterests.map(i => i.keyword.toLowerCase().trim())),
+    [myInterests]
   );
 
   const others = useMemo(
@@ -333,11 +425,11 @@ function TeaTimeMissionSection({
     [courseUsers, currentUser.id]
   );
 
-  // 키워드 2개 이상 공유
+  // 키워드 1개 이상 공유
   const keywordMatched = useMemo(
     () => others.filter(u => {
       const uKws = allInterests.filter(i => i.userId === u.id).map(i => i.keyword.toLowerCase().trim());
-      return uKws.filter(k => myKws.has(k)).length >= 2;
+      return uKws.filter(k => myKws.has(k)).length >= 1;
     }),
     [others, allInterests, myKws]
   );
@@ -354,7 +446,7 @@ function TeaTimeMissionSection({
     [others, keywordMatchedIds, currentUser.location]
   );
 
-  // 이미 요청 완료된 유저 ID 목록
+  // DB 기반 요청 완료 여부 (Firebase 실시간 반영)
   const requestedToIds = useMemo(
     () => new Set(teaTimeRequests.filter(r => r.fromUserId === currentUser.id).map(r => r.toUserId)),
     [teaTimeRequests, currentUser.id]
@@ -363,14 +455,9 @@ function TeaTimeMissionSection({
   const completedCount = requestedToIds.size;
   const missionComplete = completedCount >= 2;
 
-  const handleRequest = async (toUser: User) => {
-    if (requestedToIds.has(toUser.id) || requestingIds.has(toUser.id)) return;
-    setRequestingIds(prev => new Set(prev).add(toUser.id));
-    try {
-      await onRequest(toUser);
-    } finally {
-      setRequestingIds(prev => { const s = new Set(prev); s.delete(toUser.id); return s; });
-    }
+  const handleModalSend = async (message: string) => {
+    if (!modalUser) return;
+    await onRequest(modalUser, message);
   };
 
   const renderSection = (label: string, desc: string, users: User[], matchType: 'keyword' | 'location') => (
@@ -393,8 +480,7 @@ function TeaTimeMissionSection({
               myKws={myKws}
               matchType={matchType}
               requested={requestedToIds.has(u.id)}
-              requesting={requestingIds.has(u.id)}
-              onRequest={() => handleRequest(u)}
+              onRequest={() => !requestedToIds.has(u.id) && setModalUser(u)}
               index={i}
             />
           ))}
@@ -456,10 +542,20 @@ function TeaTimeMissionSection({
       </AnimatePresence>
 
       {/* 키워드 매칭 */}
-      {renderSection('키워드 매칭', '관심사 키워드를 2개 이상 공유하는 리더', keywordMatched, 'keyword')}
+      {renderSection('키워드 매칭', '관심사 키워드가 1개 이상 겹치는 리더', keywordMatched, 'keyword')}
 
       {/* 근무지 매칭 */}
       {renderSection('근무지 매칭', '근무지가 동일한 리더', locationMatched, 'location')}
+
+      {/* 티타임 요청 모달 */}
+      {modalUser && (
+        <TeaTimeMissionModal
+          targetUser={modalUser}
+          myInterests={myInterests}
+          onSend={handleModalSend}
+          onClose={() => setModalUser(null)}
+        />
+      )}
     </div>
   );
 }
@@ -541,7 +637,7 @@ const MISSIONS: MissionConfig[] = [
       },
       {
         heading: '미션 방법',
-        body: '1. 아래 추천 리더 목록에서 나와 키워드 또는 근무지가 매칭되는 리더를 확인하세요.\n2. 티타임 요청 버튼을 눌러 리더에게 티타임을 제안하세요.\n3. 티타임에서 자신의 경험과 노하우를 진정성 있게 나눠보세요.\n4. 대화 후 MY INSIGHT에 배운 점을 기록해보세요.',
+        body: '1. 아래 추천 리더 목록에서 나와 키워드 또는 근무지가 매칭되는 리더를 확인하세요.\n2. 티타임 요청 버튼을 눌러 리더에게 티타임을 제안하세요.\n3. 티타임에서 자신의 경험과 노하우를 진정성 있게 나눠보세요.',
       },
       {
         heading: '미션 포인트',
@@ -610,13 +706,13 @@ export default function MissionView() {
   const eveningPartners = eveningGroup.filter(u => u.id !== currentUser?.id);
 
   // 티타임 요청 핸들러
-  const handleTeaTimeRequest = async (toUser: User) => {
+  const handleTeaTimeRequest = async (toUser: User, message: string) => {
     if (!currentUser) return;
     const req: TeaTimeRequest = {
       id: `${currentUser.id}_${toUser.id}_${Date.now()}`,
       fromUserId: currentUser.id,
       toUserId: toUser.id,
-      message: '티타임 미션 요청입니다. 함께 이야기를 나눠보고 싶습니다.',
+      message,
       status: 'pending',
     };
     await sendTeaTimeRequest(req);
