@@ -262,7 +262,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setPresetInterests(presetsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PresetInterest)));
 
       const missionGroupsSnap = await getDocs(collection(firestore, 'missionGroups'));
-      setMissionGroups(missionGroupsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MissionGroup)));
+      setMissionGroups(missionGroupsSnap.docs.map(doc => parseMissionGroup(doc.data(), doc.id)));
       
       console.log("Manual data fetch complete.");
     } catch (error) {
@@ -341,9 +341,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         checkAllLoaded('presetInterests');
       }, (error) => handleError(error, 'presetInterests')));
 
-      // MissionGroups
+      // MissionGroups (groups는 JSON 문자열 배열로 저장 → 역직렬화)
       unsubscribers.push(onSnapshot(collection(firestore, 'missionGroups'), (snap) => {
-        setMissionGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MissionGroup)));
+        setMissionGroups(snap.docs.map(doc => parseMissionGroup(doc.data(), doc.id)));
         checkAllLoaded('missionGroups');
       }, (error) => handleError(error, 'missionGroups')));
     };
@@ -1031,11 +1031,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Firestore는 중첩 배열(string[][])을 지원하지 않으므로,
+  // groups의 각 요소를 JSON 문자열로 직렬화하여 저장하고 읽을 때 역직렬화한다.
+  const parseMissionGroup = (data: any, id: string): MissionGroup => ({
+    ...data,
+    id,
+    groups: (data.groups || []).map((g: any) => {
+      if (typeof g === 'string') {
+        try { return JSON.parse(g) as string[]; } catch { return [] as string[]; }
+      }
+      return (Array.isArray(g) ? g : []) as string[];
+    }),
+  });
+
   const saveMissionGroups = async (group: MissionGroup) => {
     try {
-      await setDoc(doc(firestore, 'missionGroups', group.id), sanitize(group));
+      // 중첩 배열 → 각 그룹을 JSON 문자열로 직렬화
+      const firestoreData = {
+        ...group,
+        groups: group.groups.map(g => JSON.stringify(g)),
+      };
+      await setDoc(doc(firestore, 'missionGroups', group.id), sanitize(firestoreData));
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `missionGroups/${group.id}`);
+      throw error; // 호출자(handleConfirmMatch)가 에러를 인지할 수 있도록 re-throw
     }
   };
 

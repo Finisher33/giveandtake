@@ -27,8 +27,13 @@ export function computeGroups(
 ): number[][] {
   if (users.length === 0) return [];
   const sorted = [...users].sort((a, b) => a.id.localeCompare(b.id));
+  // keyword가 없는 interest는 방어적으로 제외 (Firestore 데이터 누락 대비)
   const kwSets = sorted.map(u =>
-    new Set(interests.filter(i => i.userId === u.id).map(i => i.keyword.toLowerCase().trim()))
+    new Set(
+      interests
+        .filter(i => i.userId === u.id && i.keyword)
+        .map(i => i.keyword.toLowerCase().trim())
+    )
   );
   const pairSim = (i: number, j: number) => {
     let s = 0;
