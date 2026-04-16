@@ -399,90 +399,105 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
               exit={{ opacity: 0, y: -20 }}
               className="max-w-2xl mx-auto space-y-8"
             >
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <button
-                    onClick={() => setSelectedSessionId(null)}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-xl">arrow_back</span>
-                  </button>
-                </div>
-                <h2 className="text-xl md:text-2xl font-headline font-bold text-on-surface break-keep">
-                  {db.sessions.find(s => s.id === selectedSessionId)?.name}
-                </h2>
-                <p className="text-xs text-on-surface-variant">이 세션에서 얻은 핵심 인사이트를 기록해주세요.</p>
-              </div>
+              {/* Back + Session header */}
+              {(() => {
+                const session = db.sessions.find(s => s.id === selectedSessionId);
+                return (
+                  <div>
+                    <button
+                      onClick={() => setSelectedSessionId(null)}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors mb-4"
+                    >
+                      <span className="material-symbols-outlined text-xl">arrow_back</span>
+                    </button>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] font-black text-secondary/60 uppercase tracking-widest">{session?.module}</span>
+                      <span className="w-0.5 h-0.5 rounded-full bg-on-surface-variant/30" />
+                      <span className="text-[9px] font-medium text-on-surface-variant/40 uppercase tracking-widest">{session?.day}</span>
+                    </div>
+                    <h2 className="text-xl md:text-2xl font-headline font-black text-on-surface break-keep leading-tight">
+                      {session?.name}
+                    </h2>
+                    <p className="text-xs text-on-surface-variant/60 mt-1.5">이 세션에서 얻은 핵심 인사이트를 기록해주세요.</p>
+                  </div>
+                );
+              })()}
 
-              {/* Session Info Display */}
-              <div className="bg-surface-container p-6 rounded-3xl border border-outline-variant/20 space-y-4 shadow-sm">
-                <div className="flex items-center gap-2 text-secondary">
-                  <span className="material-symbols-outlined text-sm">info</span>
-                  <span className="text-xs font-bold uppercase tracking-wider">세션 상세 정보</span>
-                </div>
-                <div className="grid grid-cols-1 gap-4">
-                  {db.sessions.find(s => s.id === selectedSessionId)?.instructor && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-on-surface-variant/60 uppercase">강사</p>
-                      <p className="text-sm font-medium text-on-surface">{db.sessions.find(s => s.id === selectedSessionId)?.instructor}</p>
-                    </div>
-                  )}
-                  {db.sessions.find(s => s.id === selectedSessionId)?.objectives && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-on-surface-variant/60 uppercase">학습 목표</p>
-                      <p className="text-sm text-on-surface-variant leading-relaxed">{db.sessions.find(s => s.id === selectedSessionId)?.objectives}</p>
-                    </div>
-                  )}
-                  {db.sessions.find(s => s.id === selectedSessionId)?.contents && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-on-surface-variant/60 uppercase">주요 내용</p>
-                      <p className="text-sm text-on-surface-variant leading-relaxed">{db.sessions.find(s => s.id === selectedSessionId)?.contents}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+              {/* Session Info — minimal row layout */}
+              {(() => {
+                const session = db.sessions.find(s => s.id === selectedSessionId);
+                const hasInfo = session?.instructor || session?.objectives || session?.contents;
+                if (!hasInfo) return null;
+                return (
+                  <div className="divide-y divide-outline/15">
+                    {session?.instructor && (
+                      <div className="py-3 flex gap-5">
+                        <span className="text-[9px] font-black text-on-surface-variant/30 uppercase tracking-widest w-14 shrink-0 pt-0.5">강사</span>
+                        <p className="text-sm font-semibold text-on-surface">{session.instructor}</p>
+                      </div>
+                    )}
+                    {session?.objectives && (
+                      <div className="py-3 flex gap-5">
+                        <span className="text-[9px] font-black text-on-surface-variant/30 uppercase tracking-widest w-14 shrink-0 pt-0.5">목표</span>
+                        <p className="text-sm text-on-surface-variant/80 leading-relaxed">{session.objectives}</p>
+                      </div>
+                    )}
+                    {session?.contents && (
+                      <div className="py-3 flex gap-5">
+                        <span className="text-[9px] font-black text-on-surface-variant/30 uppercase tracking-widest w-14 shrink-0 pt-0.5">내용</span>
+                        <p className="text-sm text-on-surface-variant/80 leading-relaxed">{session.contents}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Input Form */}
               {(() => {
                 const isEditing = !!userInsights.find(i => i.sessionId === selectedSessionId);
                 return (
-                  <div className="space-y-6 bg-surface-container-low p-6 rounded-3xl border border-outline shadow-sm">
+                  <div className="space-y-5 pt-2">
                     {isEditing && (
-                      <div className="flex items-center gap-2 px-3 py-2 bg-secondary/10 border border-secondary/20 rounded-xl">
-                        <span className="material-symbols-outlined text-secondary text-sm">edit_note</span>
-                        <p className="text-xs font-bold text-secondary">이미 등록된 인사이트를 수정합니다.</p>
+                      <div className="flex items-center gap-1.5 text-secondary/70">
+                        <span className="material-symbols-outlined text-sm">edit_note</span>
+                        <p className="text-[11px] font-bold">등록된 인사이트를 수정합니다.</p>
                       </div>
                     )}
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-sm">key</span> 인사이트 키워드 (1개)
+
+                    {/* Keyword */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest flex items-center gap-1">
+                        인사이트 키워드 <span className="text-secondary/60">(1개)</span>
                       </label>
                       <input
                         type="text"
                         value={keyword}
                         onChange={e => setKeyword(e.target.value)}
-                        placeholder="피지컬AI"
-                        className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all"
+                        placeholder="기억에 남는 한단어를 기재해주세요. e.g.) 피지컬AI"
+                        className="w-full bg-white border-0 border-b-2 border-outline/30 focus:border-secondary px-0 py-2.5 text-base font-bold text-on-surface outline-none transition-all placeholder:font-normal placeholder:text-on-surface-variant/30 placeholder:text-sm"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-sm">description</span> 키워드 작성 이유
+
+                    {/* Description */}
+                    <div className="space-y-1.5 pt-1">
+                      <label className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest">
+                        키워드 작성 이유
                       </label>
                       <textarea
                         value={description}
                         onChange={e => setDescription(e.target.value)}
                         placeholder="위에서 키워드를 입력하신 이유와 소감을 상세히 기재해주세요. 다른 리더분들과 입력된 내용을 공유합니다."
                         rows={5}
-                        className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all resize-none"
+                        className="w-full bg-surface-container-low/50 border border-outline/20 rounded-2xl px-4 py-3.5 text-sm text-on-surface outline-none focus:border-secondary/50 transition-all resize-none placeholder:text-on-surface-variant/30"
                       />
                     </div>
+
                     <button
                       onClick={() => handleSaveInsight(selectedSessionId)}
-                      className="w-full py-4 bg-secondary text-on-secondary font-headline font-bold rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-secondary text-on-secondary font-headline font-black rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 tracking-wide"
                     >
-                      <span className="material-symbols-outlined text-sm">{isEditing ? 'edit' : 'check_circle'}</span>
-                      {isEditing ? '수정 완료' : '인사이트 등록 완료'}
+                      <span className="material-symbols-outlined text-base">{isEditing ? 'check' : 'check_circle'}</span>
+                      {isEditing ? '수정 완료' : '등록 완료'}
                     </button>
                   </div>
                 );
@@ -502,11 +517,11 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                 <p className="text-xs text-on-surface-variant mt-0.5 font-medium">참여한 세션별로 핵심 키워드와 학습 내용을 기록해보세요.</p>
               </div>
 
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 gap-3">
                 {activeSessions.length === 0 ? (
-                  <div className="p-12 bg-white rounded-xl border border-dashed border-outline text-center space-y-4">
-                    <span className="material-symbols-outlined text-4xl text-on-surface-variant/30">event_busy</span>
-                    <p className="text-sm text-on-surface-variant font-medium">현재 활성화된 세션이 없습니다.</p>
+                  <div className="p-12 bg-white rounded-2xl border border-dashed border-outline text-center space-y-3">
+                    <span className="material-symbols-outlined text-4xl text-on-surface-variant/20">event_busy</span>
+                    <p className="text-sm text-on-surface-variant/60 font-medium">현재 활성화된 세션이 없습니다.</p>
                   </div>
                 ) : (
                   activeSessions.map((session, idx) => {
@@ -514,50 +529,48 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                     return (
                       <motion.div
                         key={session.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="bg-white border border-outline rounded-xl p-6 shadow-sm hover:shadow-md transition-all group"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.04 }}
+                        className={`relative bg-white rounded-2xl overflow-hidden border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all ${insight ? 'border-secondary/25' : 'border-outline/50'}`}
                       >
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black bg-secondary/10 text-secondary px-2 py-0.5 rounded-md border border-secondary/20 uppercase tracking-widest">{session.module}</span>
-                              <span className="text-[10px] font-black bg-on-surface-variant/10 text-on-surface-variant px-2 py-0.5 rounded-md uppercase tracking-widest">{session.day}</span>
+                        {/* Top accent line */}
+                        <div className={`h-[3px] w-full ${insight ? 'bg-gradient-to-r from-secondary via-secondary/60 to-transparent' : 'bg-gradient-to-r from-outline/30 to-transparent'}`} />
+
+                        <div className="px-5 py-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <span className="text-[9px] font-black text-secondary/60 uppercase tracking-widest">{session.module}</span>
+                                <span className="w-0.5 h-0.5 rounded-full bg-on-surface-variant/30" />
+                                <span className="text-[9px] font-medium text-on-surface-variant/40 uppercase tracking-widest">{session.day}</span>
+                              </div>
+                              <h2 className="text-[15px] font-headline font-black text-on-surface leading-snug">{session.name}</h2>
                             </div>
-                            <h2 className="text-lg font-headline font-black text-on-surface uppercase tracking-tight">{session.name}</h2>
+                            <button
+                              onClick={() => startInput(session.id)}
+                              className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 ${insight ? 'text-secondary bg-secondary/8 hover:bg-secondary/15' : 'text-on-surface-variant/40 bg-surface-container hover:bg-primary/10 hover:text-primary'}`}
+                              title={insight ? '수정하기' : '작성하기'}
+                            >
+                              <span className="material-symbols-outlined text-lg">{insight ? 'edit_note' : 'add_circle'}</span>
+                            </button>
                           </div>
-                          {/* Edit / Add button */}
+
                           {insight ? (
-                            <button
-                              onClick={() => startInput(session.id)}
-                              className="w-10 h-10 rounded-lg flex items-center justify-center bg-secondary/10 text-secondary hover:bg-secondary/20 active:scale-95 transition-all"
-                              title="수정하기"
-                            >
-                              <span className="material-symbols-outlined text-xl">edit_note</span>
-                            </button>
+                            <div className="mt-3 pt-3 border-t border-outline/20">
+                              <div className="flex items-baseline gap-2 mb-1">
+                                <span className="text-[8px] font-black text-secondary/40 uppercase tracking-widest shrink-0">KEYWORD</span>
+                                <span className="text-base font-black text-secondary tracking-tight leading-none">{insight.keyword}</span>
+                              </div>
+                              <p className="text-[11px] text-on-surface-variant/60 leading-relaxed line-clamp-2">{insight.description}</p>
+                            </div>
                           ) : (
-                            <button
-                              onClick={() => startInput(session.id)}
-                              className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20 active:scale-95 transition-all"
-                              title="작성하기"
-                            >
-                              <span className="material-symbols-outlined text-xl">add_circle</span>
-                            </button>
+                            <div className="mt-3 pt-3 border-t border-outline/15 flex items-center gap-2">
+                              <span className="material-symbols-outlined text-sm text-on-surface-variant/20">add</span>
+                              <p className="text-[11px] text-on-surface-variant/30 italic">인사이트 키워드를 등록해주세요.</p>
+                            </div>
                           )}
                         </div>
-
-                        {insight ? (
-                          <div className="space-y-3 pt-3 border-t border-outline/50">
-                            <div className="flex items-center gap-2">
-                              <span className="material-symbols-outlined text-xs text-secondary">stars</span>
-                              <span className="text-sm font-black text-secondary uppercase tracking-tight">{insight.keyword}</span>
-                            </div>
-                            <p className="text-xs text-on-surface-variant leading-relaxed line-clamp-2 font-medium">{insight.description}</p>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-on-surface-variant/50 italic font-medium">아직 등록된 인사이트가 없습니다.</p>
-                        )}
                       </motion.div>
                     );
                   })
