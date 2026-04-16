@@ -5,15 +5,16 @@ import NetworkMap from './NetworkMap';
 import PeopleMap from './PeopleMap';
 import MyNetwork from './MyNetwork';
 import LibraryView from './LibraryView';
+import MissionView from './MissionView';
 import NotificationBell from './NotificationBell';
 
-export type AppTab = 'map' | 'peoplemap' | 'network' | 'library';
+export type AppTab = 'network' | 'map' | 'peoplemap' | 'library' | 'mission';
 
 export default function AppView({
   onBack,
   onLogout,
   onProfileClick,
-  initialTab = 'map',
+  initialTab = 'network',
   onTabChange,
   onNotificationClick,
 }: {
@@ -29,11 +30,14 @@ export default function AppView({
   const setActiveTab = onTabChange || (() => {});
 
   const tabs: { id: AppTab; icon: string; label: string }[] = [
+    { id: 'network',   icon: 'diversity_2',  label: 'My Network'  },
     { id: 'map',       icon: 'hub',          label: 'Network Map' },
     { id: 'peoplemap', icon: 'group',        label: 'People Map'  },
-    { id: 'network',   icon: 'diversity_2',  label: 'My Network'  },
     { id: 'library',   icon: 'auto_stories', label: 'Library'     },
+    { id: 'mission',   icon: 'flag',         label: 'Mission'     },
   ];
+
+  const scrollable = activeTab === 'network' || activeTab === 'library' || activeTab === 'mission';
 
   return (
     <div className="absolute inset-0 bg-background text-on-surface flex flex-col overflow-hidden">
@@ -75,11 +79,12 @@ export default function AppView({
       </header>
 
       {/* Main Content */}
-      <main className={`flex-1 relative ${activeTab === 'network' || activeTab === 'library' ? 'overflow-y-auto' : 'overflow-hidden'} bg-surface-container-lowest/30`}>
+      <main className={`flex-1 relative ${scrollable ? 'overflow-y-auto' : 'overflow-hidden'} bg-surface-container-lowest/30`}>
+        {activeTab === 'network'   && <MyNetwork />}
         {activeTab === 'map'       && <NetworkMap />}
         {activeTab === 'peoplemap' && <PeopleMap />}
-        {activeTab === 'network'   && <MyNetwork />}
         {activeTab === 'library'   && <LibraryView />}
+        {activeTab === 'mission'   && <MissionView />}
       </main>
 
       {/* Bottom Nav */}

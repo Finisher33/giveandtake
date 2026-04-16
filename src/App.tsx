@@ -12,7 +12,7 @@ export default function App() {
   const [view, setView] = useState<'main' | 'admin'>('main');
   const [subView, setSubView] = useState<'landing' | 'app' | 'insight' | 'profile'>('landing');
   const [lastSubView, setLastSubView] = useState<'landing' | 'app' | 'insight'>('landing');
-  const [appViewTab, setAppViewTab] = useState<AppTab>('map');
+  const [appViewTab, setAppViewTab] = useState<AppTab>('network');
 
   const handleNotificationClick = () => {
     setSubView('app');

@@ -193,7 +193,7 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
               </div>
               <div className="flex-1 min-w-0 relative z-10">
                 <p className="text-sm font-black uppercase tracking-tight text-white leading-none mb-0.5">키워드 네트워크</p>
-                <p className="text-[10px] text-white/55 font-medium">관심사로 리더 탐색</p>
+                <p className="text-[10px] text-white/55 font-medium">관심사로 연결되는 HMG 리더 네트워크</p>
               </div>
               <span className="material-symbols-outlined text-base text-white/35 group-hover:text-[#7dc8ff] group-hover:translate-x-0.5 transition-all relative z-10">arrow_forward_ios</span>
             </motion.button>
@@ -216,7 +216,7 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
               </div>
               <div className="flex-1 min-w-0 relative z-10">
                 <p className="text-sm font-black uppercase tracking-tight text-white leading-none mb-0.5">학습 인사이트 키워드</p>
-                <p className="text-[10px] text-white/55 font-medium">트렌드와 인사이트 탐색</p>
+                <p className="text-[10px] text-white/55 font-medium">리더들의 학습 인사이트 기록 및 공유</p>
               </div>
               <span className="material-symbols-outlined text-base text-white/35 group-hover:text-[#f0d080] group-hover:translate-x-0.5 transition-all relative z-10">arrow_forward_ios</span>
             </motion.button>

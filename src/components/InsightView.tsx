@@ -505,13 +505,9 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
               exit={{ opacity: 0 }}
               className="max-w-2xl mx-auto space-y-8"
             >
-              <div className="space-y-2">
-                <h1 className="text-[clamp(1.5rem,8vw,2.5rem)] font-headline font-black text-on-surface tracking-tighter leading-none break-keep w-full">
-                  be Giver be Taker
-                </h1>
-                <p className="text-on-surface-variant text-sm leading-relaxed font-medium">
-                  참여한 세션별로 핵심 키워드와 학습 내용을 기록해보세요.
-                </p>
+              <div className="pb-3 border-b-2 border-primary/30">
+                <h1 className="font-headline text-2xl font-black uppercase tracking-widest text-primary">MY INSIGHT</h1>
+                <p className="text-xs text-on-surface-variant mt-0.5 font-medium">참여한 세션별로 핵심 키워드와 학습 내용을 기록해보세요.</p>
               </div>
 
               <div className="grid grid-cols-1 gap-6">
@@ -586,15 +582,12 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
             >
               {/* Editorial Header */}
               <section>
-                <p className="text-secondary font-black tracking-widest uppercase text-[10px] mb-2 font-label">Knowledge Mapping</p>
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                   <div className={adminCourseId ? "" : "max-w-2xl"}>
-                    <h2 className="text-[clamp(1.25rem,6vw,2.5rem)] font-black font-headline text-primary leading-tight tracking-tighter mb-4 uppercase break-keep w-full">
-                      Learning Insight Dashboard
-                    </h2>
-                    <p className="text-on-surface-variant text-sm md:text-lg leading-relaxed max-w-xl font-medium break-keep">
-                      우리 클래스 리더들의 학습 인사이트를 시각화한 대시보드입니다. <br className="block md:hidden" />세션별 핵심 키워드의 흐름을 확인해보세요.
-                    </p>
+                    <div className="pb-3 border-b-2 border-primary/30 mb-4">
+                      <h2 className="font-headline text-2xl font-black uppercase tracking-widest text-primary">KEYWORD BUBBLE CHART</h2>
+                      <p className="text-xs text-on-surface-variant mt-0.5 font-medium">세션별 핵심 키워드의 흐름을 확인해보세요.</p>
+                    </div>
                   </div>
                   <div className="relative w-full md:w-72">
                     <select
