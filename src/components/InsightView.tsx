@@ -456,48 +456,43 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
               {(() => {
                 const isEditing = !!userInsights.find(i => i.sessionId === selectedSessionId);
                 return (
-                  <div className="space-y-5 pt-2">
+                  <div className="space-y-6 bg-surface-container-low p-6 rounded-3xl border border-outline shadow-sm">
                     {isEditing && (
-                      <div className="flex items-center gap-1.5 text-secondary/70">
-                        <span className="material-symbols-outlined text-sm">edit_note</span>
-                        <p className="text-[11px] font-bold">등록된 인사이트를 수정합니다.</p>
+                      <div className="flex items-center gap-2 px-3 py-2 bg-secondary/10 border border-secondary/20 rounded-xl">
+                        <span className="material-symbols-outlined text-secondary text-sm">edit_note</span>
+                        <p className="text-xs font-bold text-secondary">이미 등록된 인사이트를 수정합니다.</p>
                       </div>
                     )}
-
-                    {/* Keyword */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest flex items-center gap-1">
-                        인사이트 키워드 <span className="text-secondary/60">(1개)</span>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">key</span> 인사이트 키워드 (1개)
                       </label>
                       <input
                         type="text"
                         value={keyword}
                         onChange={e => setKeyword(e.target.value)}
                         placeholder="기억에 남는 한단어를 기재해주세요. e.g.) 피지컬AI"
-                        className="w-full bg-white border-0 border-b-2 border-outline/30 focus:border-secondary px-0 py-2.5 text-base font-bold text-on-surface outline-none transition-all placeholder:font-normal placeholder:text-on-surface-variant/30 placeholder:text-sm"
+                        className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all"
                       />
                     </div>
-
-                    {/* Description */}
-                    <div className="space-y-1.5 pt-1">
-                      <label className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest">
-                        키워드 작성 이유
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">description</span> 키워드 작성 이유
                       </label>
                       <textarea
                         value={description}
                         onChange={e => setDescription(e.target.value)}
                         placeholder="위에서 키워드를 입력하신 이유와 소감을 상세히 기재해주세요. 다른 리더분들과 입력된 내용을 공유합니다."
                         rows={5}
-                        className="w-full bg-surface-container-low/50 border border-outline/20 rounded-2xl px-4 py-3.5 text-sm text-on-surface outline-none focus:border-secondary/50 transition-all resize-none placeholder:text-on-surface-variant/30"
+                        className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all resize-none"
                       />
                     </div>
-
                     <button
                       onClick={() => handleSaveInsight(selectedSessionId)}
-                      className="w-full py-4 bg-secondary text-on-secondary font-headline font-black rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 tracking-wide"
+                      className="w-full py-4 bg-secondary text-on-secondary font-headline font-bold rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
-                      <span className="material-symbols-outlined text-base">{isEditing ? 'check' : 'check_circle'}</span>
-                      {isEditing ? '수정 완료' : '등록 완료'}
+                      <span className="material-symbols-outlined text-sm">{isEditing ? 'edit' : 'check_circle'}</span>
+                      {isEditing ? '수정 완료' : '인사이트 등록 완료'}
                     </button>
                   </div>
                 );
@@ -546,6 +541,20 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                                 <span className="text-[9px] font-medium text-on-surface-variant/40 uppercase tracking-widest">{session.day}</span>
                               </div>
                               <h2 className="text-[15px] font-headline font-black text-on-surface leading-snug">{session.name}</h2>
+                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                {session.time && (
+                                  <span className="flex items-center gap-1 text-[10px] text-on-surface-variant/50 font-medium">
+                                    <span className="material-symbols-outlined text-xs">schedule</span>
+                                    {session.time}
+                                  </span>
+                                )}
+                                {session.instructor && (
+                                  <span className="flex items-center gap-1 text-[10px] text-on-surface-variant/50 font-medium">
+                                    <span className="material-symbols-outlined text-xs">person</span>
+                                    {session.instructor}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <button
                               onClick={() => startInput(session.id)}
