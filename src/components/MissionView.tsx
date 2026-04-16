@@ -2,7 +2,6 @@ import { useState, useMemo, Key } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStore, User, Interest, TeaTimeRequest } from '../store';
 import { computeGroups } from '../utils/missionUtils';
-import { TeaReplyModal } from './TeaTimeModal';
 
 // ─── 공통 관심사 & 대화 주제 ──────────────────────────────────────────────────
 
@@ -233,284 +232,18 @@ function PartnerMatchSection({
   );
 }
 
-// ─── 티타임 미션 전용 모달 ────────────────────────────────────────────────────
-
-function TeaTimeMissionModal({
-  targetUser,
-  myInterests,
-  onSend,
-  onClose,
-}: {
-  targetUser: User;
-  myInterests: Interest[];
-  onSend: (message: string) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [msg, setMsg] = useState('');
-  const [sending, setSending] = useState(false);
-
-  const handleSend = async () => {
-    if (!msg.trim()) { alert('메시지를 입력해주세요.'); return; }
-    setSending(true);
-    try {
-      const hashtags = myInterests.map(i => `#${i.keyword}`).join(' ');
-      await onSend(hashtags ? `${hashtags}\n\n${msg}` : msg);
-      onClose();
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-outline"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* 상대방 프로필 */}
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center border border-outline bg-surface-container-low shrink-0">
-            {isUrl(targetUser.profilePic)
-              ? <img src={targetUser.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              : <span className="font-bold text-primary text-sm">{targetUser.name.charAt(0)}</span>}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-on-surface-variant truncate uppercase font-medium">
-              {targetUser.company}{targetUser.department ? ` · ${targetUser.department}` : ''}
-            </p>
-            <p className="font-bold text-on-surface text-sm">{targetUser.name}</p>
-            <p className="text-[10px] text-primary font-medium truncate">{targetUser.title}</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-highest shrink-0">
-            <span className="material-symbols-outlined text-on-surface-variant text-lg">close</span>
-          </button>
-        </div>
-
-        {/* 티타임 요청 폼 */}
-        <div className="space-y-3">
-          <p className="text-[10px] font-bold text-on-surface uppercase tracking-widest">티타임 요청</p>
-          {myInterests.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {myInterests.map(i => (
-                <span key={i.id} className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-md border border-primary/20">
-                  #{i.keyword}
-                </span>
-              ))}
-            </div>
-          )}
-          <textarea
-            value={msg}
-            onChange={e => setMsg(e.target.value)}
-            placeholder={`${targetUser.name}님에게 보낼 메시지를 작성하세요...`}
-            rows={4}
-            className="w-full bg-surface-container-low border border-outline rounded-xl p-3 text-sm resize-none outline-none focus:border-primary"
-          />
-          <button
-            onClick={handleSend}
-            disabled={sending}
-            className="w-full py-3 bg-primary text-on-primary font-bold rounded-xl shadow-lg active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {sending
-              ? <><span className="material-symbols-outlined text-base animate-spin">sync</span> 전송 중...</>
-              : '요청 보내기'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── 티타임 추천 리더 카드 ────────────────────────────────────────────────────
-
-type TeaReqStatus = 'none' | 'pending' | 'accepted' | 'rejected';
-
-const TEA_STATUS_CONFIG: Record<TeaReqStatus, { label: string; icon: string; cls: string } | null> = {
-  none: null,
-  pending: {
-    label: '신청 완료',
-    icon: 'schedule',
-    cls: 'bg-blue-50 text-blue-600 border border-blue-200',
-  },
-  accepted: {
-    label: '수락됨 ✓',
-    icon: 'check_circle',
-    cls: 'bg-green-50 text-green-700 border border-green-300',
-  },
-  rejected: {
-    label: '거절됨',
-    icon: 'cancel',
-    cls: 'bg-surface-container text-on-surface-variant border border-outline/40',
-  },
-};
-
-function TeaTimeUserCard({
-  user,
-  allInterests,
-  myKws,
-  matchType,
-  reqStatus,
-  sentMessage,
-  responseMessage,
-  receivedReq,
-  onRequest,
-  onReplyClick,
-  index,
-}: {
-  key?: Key | null;
-  user: User;
-  allInterests: Interest[];
-  myKws: Set<string>;
-  matchType: 'keyword' | 'location';
-  reqStatus: TeaReqStatus;
-  sentMessage?: string;
-  responseMessage?: string;
-  receivedReq?: TeaTimeRequest;
-  onRequest: () => void;
-  onReplyClick?: () => void;
-  index: number;
-}) {
-  const uKws = allInterests.filter(i => i.userId === user.id).map(i => i.keyword.toLowerCase().trim());
-  const sharedKws = uKws.filter(k => myKws.has(k));
-  const statusCfg = TEA_STATUS_CONFIG[reqStatus];
-  const showSentThread = reqStatus !== 'none' && !!sentMessage && !receivedReq;
-  const showResponse = reqStatus === 'accepted' && !!responseMessage;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.07, duration: 0.3 }}
-      className="bg-surface rounded-xl border border-outline/40 p-3.5 space-y-2.5"
-    >
-      <div className="flex gap-3 items-center">
-        <div className="shrink-0">
-          {isUrl(user.profilePic) ? (
-            <img src={user.profilePic} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-outline/30" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-secondary/15 flex items-center justify-center border border-secondary/25">
-              <span className="text-secondary font-black text-sm">{user.name.charAt(0)}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-on-surface leading-tight">{user.name}</p>
-          <p className="text-[10px] text-on-surface-variant mt-0.5">
-            {user.company}{user.department ? ` · ${user.department}` : ''}
-          </p>
-          {matchType === 'keyword' && sharedKws.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {sharedKws.map(kw => (
-                <span key={kw} className="bg-secondary/10 text-secondary text-[9px] font-bold rounded px-1.5 py-0.5">
-                  #{kw}
-                </span>
-              ))}
-            </div>
-          )}
-          {matchType === 'location' && user.location && (
-            <p className="text-[10px] text-on-surface-variant/60 mt-0.5">
-              <span className="material-symbols-outlined text-[10px] align-middle mr-0.5">location_on</span>
-              {user.location}
-            </p>
-          )}
-        </div>
-
-        {/* 상태 배지 or 요청 버튼 */}
-        {receivedReq ? (
-          // 받은 요청 상태
-          receivedReq.status === 'pending' ? (
-            <button
-              onClick={onReplyClick}
-              className="shrink-0 text-[10px] font-black px-2.5 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all whitespace-nowrap"
-            >
-              받은 요청 · 응답
-            </button>
-          ) : (
-            <span className={`shrink-0 text-[10px] font-black px-2.5 py-1.5 rounded-lg whitespace-nowrap border ${
-              receivedReq.status === 'accepted' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-surface-container text-on-surface-variant border-outline/40'
-            }`}>
-              {receivedReq.status === 'accepted' ? '수락함 ✓' : '거절함'}
-            </span>
-          )
-        ) : statusCfg ? (
-          <span className={`shrink-0 flex items-center gap-1 text-[10px] font-black px-2.5 py-1.5 rounded-lg whitespace-nowrap ${statusCfg.cls}`}>
-            <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-              {statusCfg.icon}
-            </span>
-            {statusCfg.label}
-          </span>
-        ) : (
-          <button
-            onClick={onRequest}
-            className="shrink-0 text-[10px] font-black px-3 py-1.5 rounded-lg bg-secondary text-on-secondary hover:bg-secondary/90 active:scale-95 transition-all whitespace-nowrap"
-          >
-            티타임 요청
-          </button>
-        )}
-      </div>
-
-      {/* 받은 요청 메시지 스레드 */}
-      {receivedReq && (
-        <div className="ml-[52px] space-y-1.5">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl rounded-tl-sm px-3 py-2">
-            <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest mb-1">받은 티타임 제안</p>
-            <p className="text-[10px] text-on-surface-variant leading-relaxed whitespace-pre-line">{receivedReq.message}</p>
-          </div>
-          {receivedReq.responseMessage && (
-            <div className="flex items-start gap-1.5 pl-3">
-              <div className="w-px self-stretch bg-primary/30 shrink-0 rounded-full" />
-              <div className="bg-primary/8 border border-primary/20 rounded-xl rounded-tl-sm px-3 py-2 flex-1">
-                <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-1">나의 응답</p>
-                <p className="text-[10px] text-on-surface-variant leading-relaxed whitespace-pre-line">{receivedReq.responseMessage}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 보낸 제안 메시지 + 답변 댓글 스레드 */}
-      {showSentThread && (
-        <div className="ml-[52px] space-y-1.5">
-          <div className="bg-primary/8 border border-primary/20 rounded-xl rounded-tl-sm px-3 py-2">
-            <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-1">내 제안</p>
-            <p className="text-[10px] text-on-surface-variant leading-relaxed whitespace-pre-line">{sentMessage}</p>
-          </div>
-          {showResponse && (
-            <div className="flex items-start gap-1.5 pl-3">
-              <div className="w-px self-stretch bg-green-300 shrink-0 rounded-full" />
-              <div className="bg-green-50 border border-green-200 rounded-xl rounded-tl-sm px-3 py-2 flex-1">
-                <p className="text-[9px] font-black text-green-700 uppercase tracking-widest mb-1">{user.name}님의 답변</p>
-                <p className="text-[10px] text-on-surface-variant leading-relaxed whitespace-pre-line">{responseMessage}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
 // ─── 티타임 미션 섹션 ─────────────────────────────────────────────────────────
 
 function TeaTimeMissionSection({
   currentUser,
-  courseUsers,
-  allInterests,
   teaTimeRequests,
-  onRequest,
+  onNavigateToLibrary,
 }: {
   currentUser: User;
-  courseUsers: User[];
-  allInterests: Interest[];
   teaTimeRequests: TeaTimeRequest[];
-  onRequest: (toUser: User, message: string) => Promise<void>;
+  onNavigateToLibrary?: () => void;
 }) {
-  const { updateTeaTimeRequest, db, fetchData } = useStore();
-  const [modalUser, setModalUser] = useState<User | null>(null);
-  const [replyModalReq, setReplyModalReq] = useState<TeaTimeRequest | null>(null);
+  const { db, fetchData } = useStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -518,136 +251,24 @@ function TeaTimeMissionSection({
     try { await fetchData(); } finally { setIsRefreshing(false); }
   };
 
-  const myInterests = useMemo(
-    () => allInterests.filter(i => i.userId === currentUser.id),
-    [allInterests, currentUser.id]
-  );
-
-  const myKws = useMemo(
-    () => new Set(myInterests.map(i => i.keyword.toLowerCase().trim())),
-    [myInterests]
-  );
-
-  const others = useMemo(
-    () => courseUsers.filter(u => u.id !== currentUser.id),
-    [courseUsers, currentUser.id]
-  );
-
-  // 키워드 1개 이상 공유
-  const keywordMatched = useMemo(
-    () => others.filter(u => {
-      const uKws = allInterests.filter(i => i.userId === u.id).map(i => i.keyword.toLowerCase().trim());
-      return uKws.filter(k => myKws.has(k)).length >= 1;
-    }),
-    [others, allInterests, myKws]
-  );
-
-  // 근무지 동일 (키워드 매칭과 중복 제외)
-  const keywordMatchedIds = useMemo(() => new Set(keywordMatched.map(u => u.id)), [keywordMatched]);
-  const locationMatched = useMemo(
-    () => others.filter(u =>
-      !keywordMatchedIds.has(u.id) &&
-      u.location &&
-      currentUser.location &&
-      u.location === currentUser.location
-    ),
-    [others, keywordMatchedIds, currentUser.location]
-  );
-
-  // DB 기반 상태 맵: toUserId → 가장 최근 요청의 status
-  const reqMap = useMemo(() => {
-    const map = new Map<string, TeaReqStatus>();
-    teaTimeRequests
+  // 내가 보낸 요청 목록 (최신순)
+  const sentRequests = useMemo(
+    () => teaTimeRequests
       .filter(r => r.fromUserId === currentUser.id)
-      .sort((a, b) => a.id.localeCompare(b.id)) // id에 timestamp 포함 → 오름차순 → 마지막이 최신
-      .forEach(r => {
-        map.set(r.toUserId, r.status as TeaReqStatus);
-      });
-    return map;
-  }, [teaTimeRequests, currentUser.id]);
+      .sort((a, b) => b.id.localeCompare(a.id)),
+    [teaTimeRequests, currentUser.id]
+  );
 
-  // 수락된 요청의 답변 메시지 맵: toUserId → responseMessage
-  const respMap = useMemo(() => {
-    const map = new Map<string, string>();
-    teaTimeRequests
-      .filter(r => r.fromUserId === currentUser.id && r.status === 'accepted' && r.responseMessage)
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .forEach(r => { map.set(r.toUserId, r.responseMessage!); });
-    return map;
-  }, [teaTimeRequests, currentUser.id]);
-
-  // 보낸 제안 메시지 맵: toUserId → message
-  const sentMsgMap = useMemo(() => {
-    const map = new Map<string, string>();
-    teaTimeRequests
-      .filter(r => r.fromUserId === currentUser.id)
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .forEach(r => { map.set(r.toUserId, r.message); });
-    return map;
-  }, [teaTimeRequests, currentUser.id]);
-
-  // 받은 요청 맵: fromUserId → TeaTimeRequest (내가 보내지 않은 경우만)
-  const courseUserIds = useMemo(() => new Set(courseUsers.map(u => u.id)), [courseUsers]);
-  const receivedMap = useMemo(() => {
-    const map = new Map<string, TeaTimeRequest>();
-    teaTimeRequests
-      .filter(r => r.toUserId === currentUser.id && courseUserIds.has(r.fromUserId))
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .forEach(r => { map.set(r.fromUserId, r); });
-    return map;
-  }, [teaTimeRequests, currentUser.id, courseUserIds]);
-
-  // 신청 건수 (pending + accepted) → 미션 진행 기준
-  const sentCount = reqMap.size;
-  // 수락 건수
+  // 중복 제거 후 신청 건수 (toUserId 기준 unique)
+  const sentCount = useMemo(
+    () => new Set(sentRequests.map(r => r.toUserId)).size,
+    [sentRequests]
+  );
   const acceptedCount = useMemo(
-    () => [...reqMap.values()].filter(s => s === 'accepted').length,
-    [reqMap]
+    () => sentRequests.filter(r => r.status === 'accepted').length,
+    [sentRequests]
   );
   const missionComplete = sentCount >= 2;
-
-  const handleModalSend = async (message: string) => {
-    if (!modalUser) return;
-    await onRequest(modalUser, message);
-  };
-
-  const renderSection = (label: string, desc: string, users: User[], matchType: 'keyword' | 'location') => (
-    <div className="space-y-2">
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-widest text-secondary">{label}</p>
-        <p className="text-[10px] text-on-surface-variant mt-0.5">{desc}</p>
-      </div>
-      {users.length === 0 ? (
-        <div className="bg-surface-container-lowest rounded-xl px-4 py-4 text-center">
-          <p className="text-xs text-on-surface-variant/50 italic">매칭되는 리더가 없습니다.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {users.map((u, i) => {
-            const sentStatus = reqMap.get(u.id) ?? 'none';
-            // 내가 보내지 않은 경우에만 받은 요청 표시
-            const receivedReq = sentStatus === 'none' ? receivedMap.get(u.id) : undefined;
-            return (
-              <TeaTimeUserCard
-                key={u.id}
-                user={u}
-                allInterests={allInterests}
-                myKws={myKws}
-                matchType={matchType}
-                reqStatus={sentStatus}
-                sentMessage={sentMsgMap.get(u.id)}
-                responseMessage={respMap.get(u.id)}
-                receivedReq={receivedReq}
-                onRequest={() => sentStatus === 'none' && !receivedReq && setModalUser(u)}
-                onReplyClick={() => receivedReq && setReplyModalReq(receivedReq)}
-                index={i}
-              />
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className="mt-5 space-y-5">
@@ -673,7 +294,7 @@ function TeaTimeMissionSection({
         </p>
       </div>
 
-      {/* 미션 진행 상태 */}
+      {/* 미션 진행 현황 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">미션 진행 현황</p>
@@ -731,38 +352,84 @@ function TeaTimeMissionSection({
         </div>
       )}
 
-      {/* 키워드 매칭 */}
-      {renderSection('키워드 매칭', '관심사 키워드가 1개 이상 겹치는 리더', keywordMatched, 'keyword')}
+      {/* 내가 보낸 티타임 요청 목록 */}
+      {sentRequests.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+            내가 제안한 티타임 ({sentCount}명)
+          </p>
+          {sentRequests.map((req, idx) => {
+            const toUser = db.users.find((u: User) => u.id === req.toUserId);
+            if (!toUser) return null;
+            const statusLabel =
+              req.status === 'accepted' ? { text: '수락됨 ✓', cls: 'bg-green-50 text-green-700 border-green-200' } :
+              req.status === 'rejected' ? { text: '거절됨', cls: 'bg-surface-container text-on-surface-variant border-outline/40' } :
+              { text: '대기 중', cls: 'bg-blue-50 text-blue-600 border-blue-200' };
+            const displayMsg = req.message.includes('\n\n') ? req.message.split('\n\n')[1] : req.message;
 
-      {/* 근무지 매칭 */}
-      {renderSection('근무지 매칭', '근무지가 동일한 리더', locationMatched, 'location')}
+            return (
+              <motion.div
+                key={req.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.06, duration: 0.3 }}
+                className="bg-surface rounded-xl border border-outline/40 p-4 space-y-3"
+              >
+                {/* 유저 정보 */}
+                <div className="flex gap-3 items-start">
+                  <div className="w-10 h-10 rounded-lg bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0 border border-outline">
+                    {isUrl(toUser.profilePic)
+                      ? <img src={toUser.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      : <span className="font-bold text-secondary text-xs">{toUser.name.charAt(0)}</span>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-on-surface truncate">{toUser.name}</p>
+                        <p className="text-[10px] text-on-surface-variant truncate">
+                          {toUser.company}{toUser.department ? ` · ${toUser.department}` : ''}
+                        </p>
+                        {toUser.title && (
+                          <p className="text-[10px] text-on-surface-variant/70 truncate">{toUser.title}</p>
+                        )}
+                      </div>
+                      <span className={`shrink-0 text-[9px] font-black px-2 py-0.5 rounded-full border whitespace-nowrap ${statusLabel.cls}`}>
+                        {statusLabel.text}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-      {/* 티타임 제안 모달 */}
-      {modalUser && (
-        <TeaTimeMissionModal
-          targetUser={modalUser}
-          myInterests={myInterests}
-          onSend={handleModalSend}
-          onClose={() => setModalUser(null)}
-        />
+                {/* 내 요청 메시지 */}
+                <div className="bg-primary/6 border border-primary/20 rounded-xl px-3 py-2.5">
+                  <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-1">내 제안</p>
+                  <p className="text-[10px] text-on-surface-variant leading-relaxed">{displayMsg}</p>
+                </div>
+
+                {/* 상대방 응답 */}
+                {req.responseMessage && (
+                  <div className={`rounded-xl px-3 py-2.5 border ${req.status === 'accepted' ? 'bg-green-50 border-green-200' : 'bg-surface-container border-outline/40'}`}>
+                    <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${req.status === 'accepted' ? 'text-green-700' : 'text-on-surface-variant'}`}>
+                      {toUser.name}님의 응답
+                    </p>
+                    <p className="text-[10px] text-on-surface-variant leading-relaxed">{req.responseMessage}</p>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
       )}
 
-      {/* 받은 티타임 요청 응답 모달 */}
-      {replyModalReq && (() => {
-        const fromUser = db.users.find(u => u.id === replyModalReq.fromUserId);
-        if (!fromUser) return null;
-        return (
-          <TeaReplyModal
-            request={replyModalReq}
-            fromUser={fromUser}
-            onReply={async (status, msg) => {
-              await updateTeaTimeRequest(replyModalReq.id, status, msg);
-              setReplyModalReq(null);
-            }}
-            onClose={() => setReplyModalReq(null)}
-          />
-        );
-      })()}
+      {/* 티타임 요청하기 버튼 */}
+      <button
+        onClick={onNavigateToLibrary}
+        className="w-full py-4 bg-secondary text-on-secondary font-black rounded-2xl shadow-md hover:bg-secondary/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 text-sm"
+      >
+        <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>auto_stories</span>
+        티타임 요청하기
+        <span className="material-symbols-outlined text-base opacity-70">arrow_forward</span>
+      </button>
     </div>
   );
 }
@@ -834,8 +501,8 @@ const MISSIONS: MissionConfig[] = [
 
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 
-export default function MissionView() {
-  const { db, currentUser, sendTeaTimeRequest } = useStore();
+export default function MissionView({ onNavigateToLibrary }: { onNavigateToLibrary?: () => void }) {
+  const { db, currentUser } = useStore();
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [revealedMap, setRevealedMap] = useState<Record<string, boolean>>({});
@@ -850,12 +517,6 @@ export default function MissionView() {
       setRevealedMap(prev => ({ ...prev, [missionId]: true }));
     }, 1500);
   };
-
-  // 같은 courseId 유저들 필터링
-  const courseUsers = useMemo(() => {
-    if (!currentUser) return [];
-    return db.users.filter(u => u.courseId === currentUser.courseId);
-  }, [db.users, currentUser]);
 
   // 확정된 DB 그룹 조회
   const confirmedLunchGroup = useMemo(() => {
@@ -876,19 +537,6 @@ export default function MissionView() {
     [confirmedLunchGroup, db.users, currentUser]
   );
   const lunchPartners = lunchGroup.filter(u => u.id !== currentUser?.id);
-
-  // 티타임 요청 핸들러
-  const handleTeaTimeRequest = async (toUser: User, message: string) => {
-    if (!currentUser) return;
-    const req: TeaTimeRequest = {
-      id: `${currentUser.id}_${toUser.id}_${Date.now()}`,
-      fromUserId: currentUser.id,
-      toUserId: toUser.id,
-      message,
-      status: 'pending',
-    };
-    await sendTeaTimeRequest(req);
-  };
 
   if (!currentUser) return null;
 
@@ -990,14 +638,12 @@ export default function MissionView() {
                     />
                   )}
 
-                  {/* 티타임 추천 매칭 */}
+                  {/* 티타임 미션 */}
                   {mission.hasTeaTimeMatch && (
                     <TeaTimeMissionSection
                       currentUser={currentUser}
-                      courseUsers={courseUsers}
-                      allInterests={db.interests}
                       teaTimeRequests={db.teaTimeRequests}
-                      onRequest={handleTeaTimeRequest}
+                      onNavigateToLibrary={onNavigateToLibrary}
                     />
                   )}
                 </div>

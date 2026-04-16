@@ -84,7 +84,7 @@ export default function AppView({
         {activeTab === 'map'       && <NetworkMap />}
         {activeTab === 'peoplemap' && <PeopleMap />}
         {activeTab === 'library'   && <LibraryView />}
-        {activeTab === 'mission'   && <MissionView />}
+        {activeTab === 'mission'   && <MissionView onNavigateToLibrary={() => setActiveTab('library')} />}
       </main>
 
       {/* Bottom Nav */}
