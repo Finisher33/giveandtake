@@ -1,74 +1,7 @@
 import { useState, useMemo, Key } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStore, User, Interest } from '../store';
-
-// ─── 결정론적 매칭 유틸리티 ───────────────────────────────────────────────────
-
-function stringToSeed(str: string): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
-
-function seededShuffle<T>(arr: T[], seed: number): T[] {
-  const a = [...arr];
-  let s = seed;
-  for (let i = a.length - 1; i > 0; i--) {
-    s = (Math.imul(1664525, s) + 1013904223) | 0;
-    const j = (s >>> 0) % (i + 1);
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function computeGroups(
-  users: User[],
-  interests: Interest[],
-  seedStr: string,
-  avoidGroups?: number[][]
-): number[][] {
-  if (users.length === 0) return [];
-  const sorted = [...users].sort((a, b) => a.id.localeCompare(b.id));
-  const n = sorted.length;
-  const kwSets = sorted.map(u =>
-    new Set(interests.filter(i => i.userId === u.id).map(i => i.keyword.toLowerCase().trim()))
-  );
-  const pairSim = (i: number, j: number) => {
-    let s = 0;
-    kwSets[i].forEach(k => { if (kwSets[j].has(k)) s++; });
-    return s;
-  };
-  const avoidSet = new Set<string>();
-  if (avoidGroups) {
-    avoidGroups.forEach(g => g.forEach(a => g.forEach(b => { if (a !== b) avoidSet.add(`${a}_${b}`); })));
-  }
-  const seed = stringToSeed(seedStr);
-  const order = seededShuffle(sorted.map((_, i) => i), seed);
-  const assigned = new Set<number>();
-  const groups: number[][] = [];
-  for (const anchor of order) {
-    if (assigned.has(anchor)) continue;
-    const group = [anchor];
-    assigned.add(anchor);
-    const remaining = order.filter(i => !assigned.has(i));
-    const scored = remaining.map(i => {
-      let score = 0;
-      group.forEach(g => { score += pairSim(g, i); if (avoidSet.has(`${g}_${i}`)) score -= 50; });
-      return { i, score };
-    }).sort((a, b) => b.score - a.score || a.i - b.i);
-    const targetExtra = ((seed ^ anchor) & 1) ? 3 : 2;
-    for (let k = 0; k < Math.min(targetExtra, scored.length); k++) {
-      group.push(scored[k].i);
-      assigned.add(scored[k].i);
-    }
-    groups.push(group);
-  }
-  // n 변수를 사용하는 dummy expression으로 lint 경고 방지
-  void n;
-  return groups;
-}
+import { computeGroups } from '../utils/missionUtils';
 
 // ─── 공통 관심사 & 대화 주제 ──────────────────────────────────────────────────
 
@@ -196,6 +129,7 @@ function PartnerMatchSection({
   revealed,
   loading,
   onReveal,
+  isConfirmed,
 }: {
   missionLabel: string;
   partners: User[];
@@ -205,6 +139,7 @@ function PartnerMatchSection({
   revealed: boolean;
   loading: boolean;
   onReveal: () => void;
+  isConfirmed: boolean;
 }) {
   const topics = useMemo(
     () => generateTopics(group, allInterests, currentUser),
@@ -222,7 +157,19 @@ function PartnerMatchSection({
         파트너 매칭
       </p>
 
-      {!revealed && !loading && (
+      {!revealed && !loading && !isConfirmed && (
+        <div className="w-full bg-surface-container-low border border-outline/40 rounded-xl py-4 px-4 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-on-surface-variant/10 flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-on-surface-variant text-base">schedule</span>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-on-surface-variant">파트너 매칭 준비중</p>
+            <p className="text-[10px] text-on-surface-variant/60 mt-0.5">관리자가 파트너를 확정하면 확인할 수 있습니다.</p>
+          </div>
+        </div>
+      )}
+
+      {!revealed && !loading && isConfirmed && (
         <button
           onClick={onReveal}
           className="w-full bg-gradient-to-r from-primary to-primary/70 text-white font-bold py-3 rounded-xl text-sm hover:opacity-90 transition-opacity active:scale-95"
@@ -434,47 +381,36 @@ export default function MissionView() {
     return db.users.filter(u => u.courseId === currentUser.courseId);
   }, [db.users, currentUser]);
 
-  // 런치 그룹 계산
-  const lunchGroups = useMemo(() => {
-    if (!currentUser) return [];
-    return computeGroups(courseUsers, db.interests, currentUser.courseId + 'lunch');
-  }, [courseUsers, db.interests, currentUser]);
+  // 확정된 DB 그룹 조회
+  const confirmedLunchGroup = useMemo(() => {
+    if (!currentUser) return null;
+    return db.missionGroups.find(g => g.courseId === currentUser.courseId && g.type === 'lunch') ?? null;
+  }, [db.missionGroups, currentUser]);
 
-  // 저녁 그룹 계산 (런치 그룹 회피)
-  const eveningGroups = useMemo(() => {
-    if (!currentUser) return [];
-    return computeGroups(courseUsers, db.interests, currentUser.courseId + 'evening', lunchGroups);
-  }, [courseUsers, db.interests, currentUser, lunchGroups]);
+  const confirmedEveningGroup = useMemo(() => {
+    if (!currentUser) return null;
+    return db.missionGroups.find(g => g.courseId === currentUser.courseId && g.type === 'evening') ?? null;
+  }, [db.missionGroups, currentUser]);
 
-  // 내 그룹 멤버 찾기
-  const getMyGroup = (groups: number[][], sortedUsers: User[]): User[] => {
+  // 확정된 그룹에서 내 파트너 찾기
+  const getMyConfirmedGroup = (confirmedGroups: string[][]): User[] => {
     if (!currentUser) return [];
-    const sorted = [...sortedUsers].sort((a, b) => a.id.localeCompare(b.id));
-    const myIdx = sorted.findIndex(u => u.id === currentUser.id);
-    if (myIdx === -1) return [];
-    const myGroup = groups.find(g => g.includes(myIdx));
+    const myGroup = confirmedGroups.find(g => g.includes(currentUser.id));
     if (!myGroup) return [];
-    return myGroup.map(i => sorted[i]);
+    return myGroup.map(uid => db.users.find(u => u.id === uid)).filter(Boolean) as User[];
   };
 
-  const sortedCourseUsers = useMemo(
-    () => [...courseUsers].sort((a, b) => a.id.localeCompare(b.id)),
-    [courseUsers]
-  );
-
   const lunchGroup = useMemo(
-    () => getMyGroup(lunchGroups, courseUsers),
-    [lunchGroups, courseUsers, currentUser]
+    () => confirmedLunchGroup ? getMyConfirmedGroup(confirmedLunchGroup.groups) : [],
+    [confirmedLunchGroup, db.users, currentUser]
   );
   const lunchPartners = lunchGroup.filter(u => u.id !== currentUser?.id);
 
   const eveningGroup = useMemo(
-    () => getMyGroup(eveningGroups, courseUsers),
-    [eveningGroups, courseUsers, currentUser]
+    () => confirmedEveningGroup ? getMyConfirmedGroup(confirmedEveningGroup.groups) : [],
+    [confirmedEveningGroup, db.users, currentUser]
   );
   const eveningPartners = eveningGroup.filter(u => u.id !== currentUser?.id);
-
-  void sortedCourseUsers; // used via getMyGroup
 
   if (!currentUser) return null;
 
@@ -501,6 +437,7 @@ export default function MissionView() {
           const isEvening = mission.id === 'evening';
           const partners = isLunch ? lunchPartners : isEvening ? eveningPartners : [];
           const group = isLunch ? lunchGroup : isEvening ? eveningGroup : [];
+          const isConfirmed = isLunch ? !!confirmedLunchGroup : isEvening ? !!confirmedEveningGroup : false;
 
           return (
             <div
@@ -579,6 +516,7 @@ export default function MissionView() {
                       revealed={revealed}
                       loading={loading}
                       onReveal={() => handleReveal(mission.id)}
+                      isConfirmed={isConfirmed}
                     />
                   )}
                 </div>

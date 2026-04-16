@@ -1,6 +1,7 @@
-import { useState, FormEvent, useRef } from 'react';
-import { useStore, User } from '../store';
+import { useState, FormEvent, useRef, useMemo } from 'react';
+import { useStore, User, MissionGroup } from '../store';
 import { cosineSimilarity } from '../services/embeddingService';
+import { computeGroups, groupIndicesToUserIds } from '../utils/missionUtils';
 import NetworkMap from './NetworkMap';
 import PeopleMap from './PeopleMap';
 import InsightView from './InsightView';
@@ -14,7 +15,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 export default function AdminView({ onBack, onLogout }: { onBack: () => void, onLogout: () => void }) {
-  const { db, addCourse, updateCourse, deleteCourse, addSession, updateSession, deleteSession, toggleSessionActive, deleteUser, resetCourseData, fetchData, addPresetInterest, deletePresetInterest } = useStore();
+  const { db, addCourse, updateCourse, deleteCourse, addSession, updateSession, deleteSession, toggleSessionActive, deleteUser, resetCourseData, fetchData, addPresetInterest, deletePresetInterest, saveMissionGroups } = useStore();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -77,6 +78,13 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
   const [printingUser, setPrintingUser] = useState<User | null>(null);
   const [printProgress, setPrintProgress] = useState(0);
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Mission Matching State
+  const [matchingPreview, setMatchingPreview] = useState<{
+    type: 'lunch' | 'evening';
+    groups: string[][];  // each group = array of userIds
+  } | null>(null);
+  const [isSavingMatch, setIsSavingMatch] = useState(false);
 
   const showStatus = (type: 'success' | 'error', text: string) => {
     setStatusMessage({ type, text });
@@ -162,6 +170,56 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
       showStatus('error', '데이터 초기화에 실패했습니다.');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handlePreviewMatch = (type: 'lunch' | 'evening') => {
+    if (!userListCourseId) return;
+    const courseUsers = db.users
+      .filter(u => u.courseId === userListCourseId)
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    let groups: string[][];
+    if (type === 'lunch') {
+      const idxGroups = computeGroups(courseUsers, db.interests, userListCourseId + 'lunch');
+      groups = groupIndicesToUserIds(idxGroups, courseUsers);
+    } else {
+      // Evening avoids lunch groups
+      const confirmedLunch = db.missionGroups.find(g => g.courseId === userListCourseId && g.type === 'lunch');
+      if (confirmedLunch) {
+        // Convert confirmed lunch userId groups to index groups for avoidGroups param
+        const lunchIdxGroups = confirmedLunch.groups.map(g =>
+          g.map(uid => courseUsers.findIndex(u => u.id === uid)).filter(i => i !== -1)
+        );
+        const idxGroups = computeGroups(courseUsers, db.interests, userListCourseId + 'evening', lunchIdxGroups);
+        groups = groupIndicesToUserIds(idxGroups, courseUsers);
+      } else {
+        const lunchIdxGroups = computeGroups(courseUsers, db.interests, userListCourseId + 'lunch');
+        const idxGroups = computeGroups(courseUsers, db.interests, userListCourseId + 'evening', lunchIdxGroups);
+        groups = groupIndicesToUserIds(idxGroups, courseUsers);
+      }
+    }
+    setMatchingPreview({ type, groups });
+  };
+
+  const handleConfirmMatch = async () => {
+    if (!matchingPreview || !userListCourseId) return;
+    setIsSavingMatch(true);
+    try {
+      const group: MissionGroup = {
+        id: `${userListCourseId}_${matchingPreview.type}`,
+        courseId: userListCourseId,
+        type: matchingPreview.type,
+        groups: matchingPreview.groups,
+        confirmedAt: new Date().toISOString(),
+      };
+      await saveMissionGroups(group);
+      setMatchingPreview(null);
+      showStatus('success', `${matchingPreview.type === 'lunch' ? '런치' : '저녁'} 파트너 매칭이 확정되었습니다.`);
+    } catch {
+      showStatus('error', '파트너 매칭 저장에 실패했습니다.');
+    } finally {
+      setIsSavingMatch(false);
     }
   };
 
@@ -1141,22 +1199,44 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
                   </select>
                 </div>
                 <div className="flex gap-3 w-full sm:w-auto overflow-x-auto no-scrollbar pb-2 sm:pb-0">
-                  <button 
+                  <button
+                    onClick={() => handlePreviewMatch('lunch')}
+                    disabled={!userListCourseId}
+                    className="flex-1 sm:flex-none px-4 py-3 bg-primary text-on-primary font-black rounded-lg flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-primary/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-xs whitespace-nowrap"
+                    title="런치 파트너 매칭"
+                  >
+                    <span className="material-symbols-outlined text-sm">restaurant</span> 런치 매칭
+                    {db.missionGroups.some(g => g.courseId === userListCourseId && g.type === 'lunch') && (
+                      <span className="ml-1 w-2 h-2 rounded-full bg-green-400 inline-block" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handlePreviewMatch('evening')}
+                    disabled={!userListCourseId}
+                    className="flex-1 sm:flex-none px-4 py-3 bg-[#b5944c] text-white font-black rounded-lg flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-[#b5944c]/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-xs whitespace-nowrap"
+                    title="저녁 파트너 매칭"
+                  >
+                    <span className="material-symbols-outlined text-sm">nightlife</span> 저녁 매칭
+                    {db.missionGroups.some(g => g.courseId === userListCourseId && g.type === 'evening') && (
+                      <span className="ml-1 w-2 h-2 rounded-full bg-green-400 inline-block" />
+                    )}
+                  </button>
+                  <button
                     onClick={() => setCourseToReset(userListCourseId)}
                     disabled={!userListCourseId}
                     className="flex-1 sm:flex-none px-4 py-3 bg-error text-white font-black rounded-lg flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-error/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-xs whitespace-nowrap"
                   >
                     <span className="material-symbols-outlined text-sm">delete_sweep</span> DB 초기화
                   </button>
-                  <button 
+                  <button
                     onClick={handlePrintAll}
                     disabled={!userListCourseId || isPrintingAll}
                     title="전체 결과 출력"
                     className="w-12 h-12 bg-secondary text-on-secondary rounded-full flex items-center justify-center hover:bg-secondary/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-md"
                   >
-                    <span className="material-symbols-outlined">{isPrintingAll ? 'sync' : 'print'}</span> 
+                    <span className="material-symbols-outlined">{isPrintingAll ? 'sync' : 'print'}</span>
                   </button>
-                  <button 
+                  <button
                     onClick={handleDownloadCSV}
                     disabled={!userListCourseId}
                     title="CSV 다운로드"
@@ -1167,104 +1247,137 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
                 </div>
               </div>
 
-              {userListCourseId && (
-                <div className="overflow-x-auto border border-outline rounded-xl">
-                  <table className="w-full text-left border-collapse min-w-[800px]">
-                    <thead>
-                      <tr className="bg-surface-container-low border-b border-outline">
-                        {[
-                          { key: 'company', label: '회사' },
-                          { key: 'name', label: '성함' },
-                          { key: 'department', label: '담당조직' },
-                          { key: 'title', label: '직책' },
-                          { key: 'location', label: '근무지' },
-                          { key: 'giver', label: 'be Giver' },
-                          { key: 'taker', label: 'be Taker' },
-                        ].map((col) => (
-                          <th 
-                            key={col.key}
-                            onClick={() => requestSort(col.key)}
-                            className="p-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant cursor-pointer hover:bg-surface-container-high transition-colors group"
-                          >
-                            <div className="flex items-center gap-1">
-                              {col.label}
-                              <span className={`material-symbols-outlined text-xs transition-opacity ${sortConfig?.key === col.key ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}>
-                                {sortConfig?.key === col.key && sortConfig.direction === 'desc' ? 'arrow_downward' : 'arrow_upward'}
-                              </span>
+              {userListCourseId && (() => {
+                const confirmedLunch = db.missionGroups.find(g => g.courseId === userListCourseId && g.type === 'lunch');
+                const confirmedEvening = db.missionGroups.find(g => g.courseId === userListCourseId && g.type === 'evening');
+
+                const getUserGroupLabel = (confirmedGroup: typeof confirmedLunch, userId: string): string => {
+                  if (!confirmedGroup) return '-';
+                  const idx = confirmedGroup.groups.findIndex(g => g.includes(userId));
+                  return idx !== -1 ? `${idx + 1}조` : '-';
+                };
+
+                return (
+                  <div className="overflow-x-auto border border-outline rounded-xl">
+                    <table className="w-full text-left border-collapse min-w-[1000px]">
+                      <thead>
+                        <tr className="bg-surface-container-low border-b border-outline">
+                          {[
+                            { key: 'company', label: '회사' },
+                            { key: 'name', label: '성함' },
+                            { key: 'department', label: '담당조직' },
+                            { key: 'title', label: '직책' },
+                            { key: 'location', label: '근무지' },
+                            { key: 'giver', label: 'be Giver' },
+                            { key: 'taker', label: 'be Taker' },
+                          ].map((col) => (
+                            <th
+                              key={col.key}
+                              onClick={() => requestSort(col.key)}
+                              className="p-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant cursor-pointer hover:bg-surface-container-high transition-colors group"
+                            >
+                              <div className="flex items-center gap-1">
+                                {col.label}
+                                <span className={`material-symbols-outlined text-xs transition-opacity ${sortConfig?.key === col.key ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}>
+                                  {sortConfig?.key === col.key && sortConfig.direction === 'desc' ? 'arrow_downward' : 'arrow_upward'}
+                                </span>
+                              </div>
+                            </th>
+                          ))}
+                          <th className="p-4 text-[10px] font-black uppercase tracking-widest text-primary text-center whitespace-nowrap">
+                            <div className="flex items-center gap-1 justify-center">
+                              <span className="material-symbols-outlined text-xs">restaurant</span> 런치조
                             </div>
                           </th>
-                        ))}
-                        <th className="p-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-center">관리</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-outline/30">
-                      {getSortedUsers().map(user => {
-                        const userInterests = db.interests.filter(i => i.userId === user.id);
-                        const giverInterests = userInterests.filter(i => i.type === 'giver');
-                        const takerInterests = userInterests.filter(i => i.type === 'taker');
-                        
-                        return (
-                          <tr key={user.id} className="hover:bg-surface-container-low transition-colors">
-                            <td className="p-4 text-sm font-medium text-on-surface">{user.company}</td>
-                            <td className="p-4 text-sm font-bold text-primary">{user.name}</td>
-                            <td className="p-4 text-sm text-on-surface-variant">{user.department}</td>
-                            <td className="p-4 text-sm text-on-surface-variant">{user.title}</td>
-                            <td className="p-4 text-sm text-on-surface-variant">{user.location}</td>
-                            <td className="p-4 text-sm text-on-surface-variant">
-                              <div className="flex flex-wrap gap-1.5">
-                                {giverInterests.map((i, idx) => (
-                                  <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
-                                    {i.keyword}
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="p-4 text-sm text-on-surface-variant">
-                              <div className="flex flex-wrap gap-1.5">
-                                {takerInterests.map((i, idx) => (
-                                  <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/10 text-secondary">
-                                    {i.keyword}
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="p-4 text-center">
-                              <div className="flex items-center justify-center gap-2">
-                                <button 
-                                  onClick={() => handlePrintUser(user)}
-                                  className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                  title="출력"
-                                >
-                                  <span className="material-symbols-outlined text-lg">print</span>
-                                </button>
-                                <button 
-                                  onClick={() => setUserToEdit(user)}
-                                  className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                  title="수정"
-                                >
-                                  <span className="material-symbols-outlined text-lg">edit</span>
-                                </button>
-                                <button 
-                                  onClick={() => setUserToDelete(user.id)}
-                                  className="p-2 text-on-surface-variant hover:text-error transition-colors"
-                                  title="삭제"
-                                >
-                                  <span className="material-symbols-outlined text-lg">delete</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {getSortedUsers().length === 0 && (
-                        <tr>
-                          <td colSpan={9} className="p-12 text-center text-on-surface-variant italic font-medium">등록된 인원이 없습니다.</td>
+                          <th className="p-4 text-[10px] font-black uppercase tracking-widest text-[#b5944c] text-center whitespace-nowrap">
+                            <div className="flex items-center gap-1 justify-center">
+                              <span className="material-symbols-outlined text-xs">nightlife</span> 저녁조
+                            </div>
+                          </th>
+                          <th className="p-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-center">관리</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-outline/30">
+                        {getSortedUsers().map(user => {
+                          const userInterests = db.interests.filter(i => i.userId === user.id);
+                          const giverInterests = userInterests.filter(i => i.type === 'giver');
+                          const takerInterests = userInterests.filter(i => i.type === 'taker');
+                          const lunchLabel = getUserGroupLabel(confirmedLunch, user.id);
+                          const eveningLabel = getUserGroupLabel(confirmedEvening, user.id);
+
+                          return (
+                            <tr key={user.id} className="hover:bg-surface-container-low transition-colors">
+                              <td className="p-4 text-sm font-medium text-on-surface">{user.company}</td>
+                              <td className="p-4 text-sm font-bold text-primary">{user.name}</td>
+                              <td className="p-4 text-sm text-on-surface-variant">{user.department}</td>
+                              <td className="p-4 text-sm text-on-surface-variant">{user.title}</td>
+                              <td className="p-4 text-sm text-on-surface-variant">{user.location}</td>
+                              <td className="p-4 text-sm text-on-surface-variant">
+                                <div className="flex flex-wrap gap-1.5">
+                                  {giverInterests.map((i, idx) => (
+                                    <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
+                                      {i.keyword}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="p-4 text-sm text-on-surface-variant">
+                                <div className="flex flex-wrap gap-1.5">
+                                  {takerInterests.map((i, idx) => (
+                                    <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/10 text-secondary">
+                                      {i.keyword}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="p-4 text-center">
+                                <span className={`text-xs font-black px-2.5 py-1 rounded-lg ${lunchLabel !== '-' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant/40'}`}>
+                                  {lunchLabel}
+                                </span>
+                              </td>
+                              <td className="p-4 text-center">
+                                <span className={`text-xs font-black px-2.5 py-1 rounded-lg ${eveningLabel !== '-' ? 'bg-[#b5944c]/10 text-[#b5944c]' : 'text-on-surface-variant/40'}`}>
+                                  {eveningLabel}
+                                </span>
+                              </td>
+                              <td className="p-4 text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    onClick={() => handlePrintUser(user)}
+                                    className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                    title="출력"
+                                  >
+                                    <span className="material-symbols-outlined text-lg">print</span>
+                                  </button>
+                                  <button
+                                    onClick={() => setUserToEdit(user)}
+                                    className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                    title="수정"
+                                  >
+                                    <span className="material-symbols-outlined text-lg">edit</span>
+                                  </button>
+                                  <button
+                                    onClick={() => setUserToDelete(user.id)}
+                                    className="p-2 text-on-surface-variant hover:text-error transition-colors"
+                                    title="삭제"
+                                  >
+                                    <span className="material-symbols-outlined text-lg">delete</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {getSortedUsers().length === 0 && (
+                          <tr>
+                            <td colSpan={11} className="p-12 text-center text-on-surface-variant italic font-medium">등록된 인원이 없습니다.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ) : adminSubView === 'presets' ? (
@@ -1433,6 +1546,79 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
             }}
             showBack={true}
           />
+        </div>
+      )}
+
+      {/* Mission Matching Preview Modal */}
+      {matchingPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-outline max-h-[85vh] flex flex-col">
+            <div className="flex items-center gap-3 mb-4 shrink-0">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${matchingPreview.type === 'lunch' ? 'bg-primary/10' : 'bg-[#b5944c]/10'}`}>
+                <span className={`material-symbols-outlined ${matchingPreview.type === 'lunch' ? 'text-primary' : 'text-[#b5944c]'}`}>
+                  {matchingPreview.type === 'lunch' ? 'restaurant' : 'nightlife'}
+                </span>
+              </div>
+              <div>
+                <h3 className="text-base font-black text-on-surface uppercase tracking-tight">
+                  {matchingPreview.type === 'lunch' ? '런치' : '저녁'} 파트너 매칭 결과
+                </h3>
+                <p className="text-xs text-on-surface-variant mt-0.5">총 {matchingPreview.groups.length}개 조 편성 — 확정 후 유저에게 공개됩니다</p>
+              </div>
+              <button onClick={() => setMatchingPreview(null)} className="ml-auto p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant">
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+              {matchingPreview.groups.map((group, gi) => (
+                <div key={gi} className="border border-outline/50 rounded-xl p-3">
+                  <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${matchingPreview.type === 'lunch' ? 'text-primary' : 'text-[#b5944c]'}`}>
+                    {gi + 1}조
+                  </p>
+                  <div className="space-y-1.5">
+                    {group.map(uid => {
+                      const user = db.users.find(u => u.id === uid);
+                      if (!user) return null;
+                      return (
+                        <div key={uid} className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-black text-on-surface-variant">{user.name.charAt(0)}</span>
+                          </div>
+                          <span className="text-xs font-bold text-on-surface">{user.name}</span>
+                          <span className="text-[10px] text-on-surface-variant/60">{user.company} · {user.title}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3 mt-4 shrink-0">
+              <button
+                onClick={() => setMatchingPreview(null)}
+                className="flex-1 px-4 py-3 border border-outline rounded-xl text-on-surface font-black text-sm hover:bg-surface-container-low transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleConfirmMatch}
+                disabled={isSavingMatch}
+                className={`flex-1 px-4 py-3 rounded-xl text-white font-black text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 ${matchingPreview.type === 'lunch' ? 'bg-primary hover:bg-primary/90' : 'bg-[#b5944c] hover:bg-[#b5944c]/90'}`}
+              >
+                {isSavingMatch ? (
+                  <>
+                    <span className="material-symbols-outlined text-base animate-spin">sync</span> 저장 중...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-base">check_circle</span> 확정하기
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

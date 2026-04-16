@@ -112,6 +112,14 @@ export interface PresetInterest {
   keyword: string;
 }
 
+export interface MissionGroup {
+  id: string;         // `${courseId}_${type}`
+  courseId: string;
+  type: 'lunch' | 'evening';
+  groups: string[][];  // array of groups, each group = array of userIds
+  confirmedAt: string;
+}
+
 interface Database {
   courses: Course[];
   sessions: Session[];
@@ -121,6 +129,7 @@ interface Database {
   userInsights: UserInsight[];
   canonicalTerms: CanonicalTerm[];
   presetInterests: PresetInterest[];
+  missionGroups: MissionGroup[];
 }
 
 const defaultDb: Database = {
@@ -134,7 +143,8 @@ const defaultDb: Database = {
   teaTimeRequests: [],
   userInsights: [],
   canonicalTerms: [],
-  presetInterests: []
+  presetInterests: [],
+  missionGroups: []
 };
 
 interface StoreContextType {
@@ -163,6 +173,7 @@ interface StoreContextType {
   fetchData: () => Promise<void>;
   addPresetInterest: (keyword: string) => Promise<void>;
   deletePresetInterest: (id: string) => Promise<void>;
+  saveMissionGroups: (group: MissionGroup) => Promise<void>;
   isDemoMode: boolean;
   toggleDemoMode: (active: boolean, role?: 'user' | 'admin') => void;
   resetDemoData: () => void;
@@ -179,7 +190,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [userInsights, setUserInsights] = useState<UserInsight[]>([]);
   const [canonicalTerms, setCanonicalTerms] = useState<CanonicalTerm[]>([]);
   const [presetInterests, setPresetInterests] = useState<PresetInterest[]>([]);
-  
+  const [missionGroups, setMissionGroups] = useState<MissionGroup[]>([]);
+
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
 
@@ -196,7 +208,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     teaTimeRequests,
     userInsights,
     canonicalTerms,
-    presetInterests
+    presetInterests,
+    missionGroups
   };
 
   const effectiveCurrentUser = isDemoMode ? demoUser : currentUser;
@@ -247,6 +260,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       const presetsSnap = await getDocs(collection(firestore, 'presetInterests'));
       setPresetInterests(presetsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PresetInterest)));
+
+      const missionGroupsSnap = await getDocs(collection(firestore, 'missionGroups'));
+      setMissionGroups(missionGroupsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MissionGroup)));
       
       console.log("Manual data fetch complete.");
     } catch (error) {
@@ -257,7 +273,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // 1단계: Firestore 실시간 리스너 설정 (Step 1: Setup Firestore real-time listeners for each collection)
   useEffect(() => {
     const unsubscribers: (() => void)[] = [];
-    const collectionsToLoad = ['users', 'courses', 'sessions', 'interests', 'teaTimeRequests', 'userInsights', 'canonicalTerms', 'presetInterests'];
+    const collectionsToLoad = ['users', 'courses', 'sessions', 'interests', 'teaTimeRequests', 'userInsights', 'canonicalTerms', 'presetInterests', 'missionGroups'];
     const loadedCollections = new Set<string>();
 
     const checkAllLoaded = (collectionName: string) => {
@@ -324,6 +340,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setPresetInterests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PresetInterest)));
         checkAllLoaded('presetInterests');
       }, (error) => handleError(error, 'presetInterests')));
+
+      // MissionGroups
+      unsubscribers.push(onSnapshot(collection(firestore, 'missionGroups'), (snap) => {
+        setMissionGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MissionGroup)));
+        checkAllLoaded('missionGroups');
+      }, (error) => handleError(error, 'missionGroups')));
     };
 
     // 마이그레이션 및 초기화 로직 (Migration and Initialization)
@@ -1009,13 +1031,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const saveMissionGroups = async (group: MissionGroup) => {
+    try {
+      await setDoc(doc(firestore, 'missionGroups', group.id), sanitize(group));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `missionGroups/${group.id}`);
+    }
+  };
+
   return (
     <StoreContext.Provider value={{
       db, currentUser: effectiveCurrentUser, isDbLoaded, login, register, logout, addCourse, updateCourse, deleteCourse, resetCourseData,
       addSession, updateSession, deleteSession,
       saveInterests, updateUser, deleteUser, updateUserProfile, sendTeaTimeRequest, updateTeaTimeRequest,
       toggleSessionActive, saveUserInsight, toggleInsightLike, fetchData,
-      addPresetInterest, deletePresetInterest,
+      addPresetInterest, deletePresetInterest, saveMissionGroups,
       isDemoMode, toggleDemoMode, resetDemoData
     }}>
       {children}
