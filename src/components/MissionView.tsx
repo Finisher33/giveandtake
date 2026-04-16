@@ -318,12 +318,33 @@ function TeaTimeMissionModal({
 
 // ─── 티타임 추천 리더 카드 ────────────────────────────────────────────────────
 
+type TeaReqStatus = 'none' | 'pending' | 'accepted' | 'rejected';
+
+const TEA_STATUS_CONFIG: Record<TeaReqStatus, { label: string; icon: string; cls: string } | null> = {
+  none: null,
+  pending: {
+    label: '신청 완료',
+    icon: 'schedule',
+    cls: 'bg-blue-50 text-blue-600 border border-blue-200',
+  },
+  accepted: {
+    label: '수락됨 ✓',
+    icon: 'check_circle',
+    cls: 'bg-green-50 text-green-700 border border-green-300',
+  },
+  rejected: {
+    label: '거절됨',
+    icon: 'cancel',
+    cls: 'bg-surface-container text-on-surface-variant border border-outline/40',
+  },
+};
+
 function TeaTimeUserCard({
   user,
   allInterests,
   myKws,
   matchType,
-  requested,
+  reqStatus,
   onRequest,
   index,
 }: {
@@ -332,12 +353,13 @@ function TeaTimeUserCard({
   allInterests: Interest[];
   myKws: Set<string>;
   matchType: 'keyword' | 'location';
-  requested: boolean;
+  reqStatus: TeaReqStatus;
   onRequest: () => void;
   index: number;
 }) {
   const uKws = allInterests.filter(i => i.userId === user.id).map(i => i.keyword.toLowerCase().trim());
   const sharedKws = uKws.filter(k => myKws.has(k));
+  const statusCfg = TEA_STATUS_CONFIG[reqStatus];
 
   return (
     <motion.div
@@ -378,9 +400,13 @@ function TeaTimeUserCard({
         )}
       </div>
 
-      {requested ? (
-        <span className="shrink-0 text-[10px] font-black px-3 py-1.5 rounded-lg bg-green-500/10 text-green-600 border border-green-500/25 whitespace-nowrap">
-          요청완료
+      {/* 상태 배지 or 요청 버튼 */}
+      {statusCfg ? (
+        <span className={`shrink-0 flex items-center gap-1 text-[10px] font-black px-2.5 py-1.5 rounded-lg whitespace-nowrap ${statusCfg.cls}`}>
+          <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+            {statusCfg.icon}
+          </span>
+          {statusCfg.label}
         </span>
       ) : (
         <button
@@ -447,14 +473,26 @@ function TeaTimeMissionSection({
     [others, keywordMatchedIds, currentUser.location]
   );
 
-  // DB 기반 요청 완료 여부 (Firebase 실시간 반영)
-  const requestedToIds = useMemo(
-    () => new Set(teaTimeRequests.filter(r => r.fromUserId === currentUser.id).map(r => r.toUserId)),
-    [teaTimeRequests, currentUser.id]
-  );
+  // DB 기반 상태 맵: toUserId → 가장 최근 요청의 status
+  const reqMap = useMemo(() => {
+    const map = new Map<string, TeaReqStatus>();
+    teaTimeRequests
+      .filter(r => r.fromUserId === currentUser.id)
+      .sort((a, b) => a.id.localeCompare(b.id)) // id에 timestamp 포함 → 오름차순 → 마지막이 최신
+      .forEach(r => {
+        map.set(r.toUserId, r.status as TeaReqStatus);
+      });
+    return map;
+  }, [teaTimeRequests, currentUser.id]);
 
-  const completedCount = requestedToIds.size;
-  const missionComplete = completedCount >= 2;
+  // 신청 건수 (pending + accepted) → 미션 진행 기준
+  const sentCount = reqMap.size;
+  // 수락 건수
+  const acceptedCount = useMemo(
+    () => [...reqMap.values()].filter(s => s === 'accepted').length,
+    [reqMap]
+  );
+  const missionComplete = sentCount >= 2;
 
   const handleModalSend = async (message: string) => {
     if (!modalUser) return;
@@ -473,18 +511,21 @@ function TeaTimeMissionSection({
         </div>
       ) : (
         <div className="space-y-2">
-          {users.map((u, i) => (
-            <TeaTimeUserCard
-              key={u.id}
-              user={u}
-              allInterests={allInterests}
-              myKws={myKws}
-              matchType={matchType}
-              requested={requestedToIds.has(u.id)}
-              onRequest={() => !requestedToIds.has(u.id) && setModalUser(u)}
-              index={i}
-            />
-          ))}
+          {users.map((u, i) => {
+            const status = reqMap.get(u.id) ?? 'none';
+            return (
+              <TeaTimeUserCard
+                key={u.id}
+                user={u}
+                allInterests={allInterests}
+                myKws={myKws}
+                matchType={matchType}
+                reqStatus={status}
+                onRequest={() => status === 'none' && setModalUser(u)}
+                index={i}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -498,7 +539,7 @@ function TeaTimeMissionSection({
       <div className="bg-secondary/8 border border-secondary/25 rounded-xl px-4 py-3 flex items-start gap-2.5">
         <span className="material-symbols-outlined text-secondary text-base mt-0.5 shrink-0">tips_and_updates</span>
         <p className="text-xs text-on-surface-variant leading-relaxed">
-          과정 종료 후 티타임을 <span className="font-black text-on-surface">2회 이상</span> 진행해보세요.
+          과정 진행 중에 최소 <span className="font-black text-on-surface">2명 이상</span>의 리더에게 티타임을 먼저 제안해보세요.
         </p>
       </div>
 
@@ -506,15 +547,23 @@ function TeaTimeMissionSection({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">미션 진행 현황</p>
-          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${missionComplete ? 'bg-green-500/15 text-green-600' : 'bg-surface-container-high text-on-surface-variant'}`}>
-            {completedCount} / 2 완료
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+              신청 {sentCount}건
+            </span>
+            <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-300 px-2 py-0.5 rounded-md">
+              수락 {acceptedCount}건
+            </span>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${missionComplete ? 'bg-green-500/15 text-green-600' : 'bg-surface-container-high text-on-surface-variant'}`}>
+              {sentCount} / 2
+            </span>
+          </div>
         </div>
         <div className="h-2 bg-surface-container-high rounded-full overflow-hidden">
           <motion.div
             className={`h-full rounded-full ${missionComplete ? 'bg-green-500' : 'bg-secondary'}`}
             initial={{ width: 0 }}
-            animate={{ width: `${Math.min(completedCount / 2 * 100, 100)}%` }}
+            animate={{ width: `${Math.min(sentCount / 2 * 100, 100)}%` }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
           />
         </div>
@@ -535,7 +584,9 @@ function TeaTimeMissionSection({
               <span className="material-symbols-outlined text-white text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>emoji_events</span>
               <div className="flex-1">
                 <p className="font-black text-sm text-white uppercase tracking-wide">Mission Complete!</p>
-                <p className="text-[10px] text-white/80 mt-0.5">{completedCount}명의 리더에게 티타임을 제안했습니다. 🎉</p>
+                <p className="text-[10px] text-white/80 mt-0.5">
+                  {sentCount}명에게 신청 · {acceptedCount}명 수락 — 멋진 연결을 만들고 있어요! 🎉
+                </p>
               </div>
             </div>
           </motion.div>
@@ -634,15 +685,15 @@ const MISSIONS: MissionConfig[] = [
     sections: [
       {
         heading: '미션 목표',
-        body: '과정 종료 후 최소 2명의 리더에게 티타임을 먼저 제안하고, 자신의 Giver 키워드를 바탕으로 실질적인 도움을 나눠보세요.',
+        body: '과정 진행 중에 최소 2명 이상의 리더에게 티타임을 먼저 제안하여, 본 과정에서 만들어진 리더간의 느슨한 연결이 좀 더 지속적인 연결로 이어질 수 있도록 실천하는 것.',
       },
       {
         heading: '미션 방법',
-        body: '1. 아래 추천 리더 목록에서 나와 키워드 또는 근무지가 매칭되는 리더를 확인하세요.\n2. 티타임 요청 버튼을 눌러 리더에게 티타임을 제안하세요.\n3. 티타임에서 자신의 경험과 노하우를 진정성 있게 나눠보세요.',
+        body: '1. 아래 추천 리더 목록에서 나와 키워드 또는 근무지가 매칭되는 리더를 확인하세요.\n2. 티타임 요청 버튼을 눌러 리더에게 티타임을 제안하세요.\n3. 티타임 일정을 구체적으로 조율하고, 여유가 되신다면 식사도 함께하세요.',
       },
       {
         heading: '미션 포인트',
-        body: '주는 것(Giver)이 곧 받는 것(Taker)이 됩니다. 내가 먼저 가치를 제공함으로써 신뢰 기반의 네트워크가 형성됩니다. 과정이 끝난 후에도 이어지는 관계를 만들어보세요.',
+        body: '교육장에서의 만남과 실제 현업에서의 만남은 또 다른 의미와 경험이 될 것 입니다. 서로의 제안을 소중히 여기시고, 실제 일정에 등록함으로써 소중한 만남을 가져주시면 감사하겠습니다.',
       },
     ],
     hasPartnerMatch: false,
@@ -744,10 +795,10 @@ export default function MissionView() {
 
           // 티타임 미션 완료 여부 (카드 헤더 배지용)
           const isTeatime = mission.id === 'teatime';
-          const teatimeRequestedCount = isTeatime
+          const teatimeSentCount = isTeatime
             ? new Set(db.teaTimeRequests.filter(r => r.fromUserId === currentUser.id).map(r => r.toUserId)).size
             : 0;
-          const teatimeComplete = isTeatime && teatimeRequestedCount >= 2;
+          const teatimeComplete = isTeatime && teatimeSentCount >= 2;
 
           return (
             <div
