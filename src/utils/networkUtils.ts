@@ -70,14 +70,18 @@ export function calculateSNAScores(currentUser: User, db: any): SNAResult | null
     return dist;
   };
 
-  // 1. 연결 중심성 (마당발) — 연결된 리더가 0명이면 키워드와 무관하게 0점
+  // 1. 연결 중심성 (마당발) — 내 관심사 키워드 수 + 키워드별 연결 리더 수 합산
   const myKwCount = userKeywords.get(currentUser.id)?.size || 0;
-  const myNeighborCount = userIds.filter(id => id !== currentUser.id && areConnected(currentUser.id, id)).length;
+  const myKwIds = Array.from(userKeywords.get(currentUser.id) || new Set<string>());
+  let keywordLinkedLeadersSum = 0;
+  for (const kwId of myKwIds) {
+    keywordLinkedLeadersSum += userIds.filter(
+      id => id !== currentUser.id && (userKeywords.get(id) || new Set()).has(kwId)
+    ).length;
+  }
   const allUniqueKws = new Set(courseInterests.map((i: Interest) => i.canonicalId || i.keyword)).size;
-  const degreeMax = Math.max(1, allUniqueKws + (n - 1));
-  const degreeScore = myNeighborCount === 0
-    ? 0
-    : Math.min(100, ((myKwCount + myNeighborCount) / degreeMax) * 100);
+  const degreeMax = Math.max(1, allUniqueKws * n);
+  const degreeScore = Math.min(100, ((myKwCount + keywordLinkedLeadersSum) / degreeMax) * 100);
 
   // 2. 매개 중심성 (게이트키퍼)
   const distFromMe = bfs(currentUser.id);
@@ -125,7 +129,7 @@ export function calculateSNAScores(currentUser: User, db: any): SNAResult | null
       icon: '🤝',
       description: '당신은 이 네트워크의 핵심 연결자입니다. 다양한 키워드와 많은 리더와 연결되어 있어 폭넓은 영향력을 발휘합니다.',
       metricName: '연결 중심성',
-      detail: `키워드 ${myKwCount}개 · 연결 리더 ${myNeighborCount}명`,
+      detail: `관심사 키워드 ${myKwCount}개 · 키워드별 연결 리더 합산 ${keywordLinkedLeadersSum}명`,
     },
     {
       type: '게이트키퍼',

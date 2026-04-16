@@ -85,7 +85,7 @@ export default function LibraryView() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [replyingToReq, setReplyingToReq] = useState<TeaTimeRequest | null>(null);
   const [search, setSearch] = useState('');
-  const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
+  const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
 
   const courseUsers = useMemo(() =>
     db.users.filter(u => u.courseId === currentUser?.courseId),
@@ -112,15 +112,6 @@ export default function LibraryView() {
       .map(([keyword, count]) => ({ keyword, count }));
   }, [courseUsers, db.interests]);
 
-  const toggleKeyword = (keyword: string) => {
-    setSelectedKeywords(prev => {
-      const next = new Set(prev);
-      if (next.has(keyword)) next.delete(keyword);
-      else next.add(keyword);
-      return next;
-    });
-  };
-
   const filteredUsers = useMemo(() => {
     const q = search.toLowerCase().trim();
     return courseUsers
@@ -136,19 +127,16 @@ export default function LibraryView() {
             );
           if (!matches) return false;
         }
-        if (selectedKeywords.size > 0) {
-          const userKeywords = new Set(
-            db.interests
-              .filter((i: Interest) => i.userId === u.id)
-              .map((i: Interest) => i.keyword.trim())
+        if (selectedKeyword) {
+          const hasKeyword = db.interests.some(
+            (i: Interest) => i.userId === u.id && i.keyword.trim() === selectedKeyword
           );
-          const hasAll = [...selectedKeywords].every(kw => userKeywords.has(kw));
-          if (!hasAll) return false;
+          if (!hasKeyword) return false;
         }
         return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-  }, [courseUsers, search, selectedKeywords, db.interests]);
+  }, [courseUsers, search, selectedKeyword, db.interests]);
 
   const handleSend = (toUserId: string, message: string) => {
     const exists = db.teaTimeRequests.find(r =>
@@ -193,9 +181,9 @@ export default function LibraryView() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">키워드로 필터</p>
-            {selectedKeywords.size > 0 && (
+            {selectedKeyword && (
               <button
-                onClick={() => setSelectedKeywords(new Set())}
+                onClick={() => setSelectedKeyword(null)}
                 className="text-[10px] font-bold text-primary hover:underline"
               >
                 초기화
@@ -204,11 +192,11 @@ export default function LibraryView() {
           </div>
           <div className="flex flex-wrap gap-1.5">
             {allKeywords.map(({ keyword, count }) => {
-              const active = selectedKeywords.has(keyword);
+              const active = selectedKeyword === keyword;
               return (
                 <button
                   key={keyword}
-                  onClick={() => toggleKeyword(keyword)}
+                  onClick={() => setSelectedKeyword(active ? null : keyword)}
                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
                     active
                       ? 'bg-primary text-on-primary border-primary shadow-sm'
@@ -225,11 +213,11 @@ export default function LibraryView() {
       )}
 
       {/* Result count */}
-      {(search || selectedKeywords.size > 0) && (
+      {(search || selectedKeyword) && (
         <p className="text-xs text-on-surface-variant">
           검색 결과 <span className="font-bold text-primary">{filteredUsers.length}</span>명
-          {selectedKeywords.size > 0 && (
-            <span className="ml-1">· 선택된 키워드 {selectedKeywords.size}개</span>
+          {selectedKeyword && (
+            <span className="ml-1">· <span className="font-bold text-primary">#{selectedKeyword}</span> 관심 리더</span>
           )}
         </p>
       )}
