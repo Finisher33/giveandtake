@@ -25,11 +25,11 @@ function SectionTitle({ icon, title, badge }: { icon: string; title: string; bad
   );
 }
 
-// ─── SNA 지표 쉬운 설명 ──────────────────────────────────────────────────────
+// ─── SNA 지표 산출 방식 설명 ─────────────────────────────────────────────────
 const SNA_METRIC_EXPLANATIONS: Record<string, string> = {
-  '마당발': '내가 등록한 관심사 키워드의 수와, 각 키워드에 연결된 리더의 수를 합산하여 산출됩니다. 다양한 관심사를 보유하고 각 키워드마다 연결된 리더가 많을수록 점수가 높아지며, 네트워크 안에서 폭넓게 연결된 핵심 허브 역할을 나타냅니다.',
-  '게이트키퍼': '서로 연결되지 않은 두 그룹 사이에서 다리 역할을 얼마나 자주 하는지를 측정합니다. 내가 없으면 정보가 전달되기 어려운 경로가 많을수록 점수가 높아지며, 조직 내 정보 흐름의 핵심 연결고리 역할을 나타냅니다.',
-  '전파자': '나로부터 네트워크의 모든 사람에게 정보가 얼마나 빠르게 도달할 수 있는지를 측정합니다. 여기서 \'평균 거리\'란 공통 키워드를 통해 다른 리더에게 닿기까지 거쳐야 하는 연결 단계의 수로, 1단계는 직접 연결(공통 키워드가 있는 경우), 2단계는 한 명을 매개로 연결됨을 의미합니다. 이 거리가 짧을수록 소식이나 아이디어가 네트워크 전체로 빠르게 퍼질 수 있는 위치에 있음을 나타냅니다.',
+  '마당발': '① 내가 등록한 관심사 키워드 수를 셉니다. ② 각 키워드마다 같은 키워드를 가진 다른 리더 수를 모두 더합니다. ③ 두 값을 합산한 뒤, 과정 전체 고유 키워드 수 × 전체 리더 수로 나눠 100점 만점으로 환산합니다. 키워드가 다양하고, 각 키워드에 연결된 리더가 많을수록 점수가 높아집니다.',
+  '게이트키퍼': '① 나를 제외한 두 리더(A, B) 사이의 최단 연결 경로를 모두 탐색합니다. ② 그 경로가 나를 경유하는 경우를 셉니다(A→나→B가 최단 경로이면 +1). ③ 내가 경유하는 경로 수를 전체 리더 쌍의 수로 나눠 100점 만점으로 환산합니다. 내가 없으면 서로 연결되기 어려운 리더 사이를 많이 잇고 있을수록 점수가 높아집니다.',
+  '전파자': '① 나에서 다른 모든 리더까지 도달하는 데 필요한 연결 단계 수를 계산합니다(1단계 = 공통 키워드로 직접 연결, 2단계 = 한 명을 거쳐 연결). ② 도달 가능한 리더 수²를 (전체 리더-1) × 총 거리 합으로 나눠 100점 만점으로 환산합니다. 도달할 수 있는 리더가 많고, 평균 거리가 짧을수록 점수가 높아집니다.',
 };
 
 export default function MyNetwork({ targetUser, hideActions = false }: MyNetworkProps) {
@@ -244,7 +244,11 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
               <div className="text-4xl shrink-0">{snaResult.dominant!.icon}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest mb-0.5">{snaResult.dominant!.metricName} 최고</p>
-                <h3 className="text-xl font-black text-primary mb-2">{snaResult.dominant!.type} 유형</h3>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <h3 className="text-xl font-black text-primary">{snaResult.dominant!.type} 유형</h3>
+                  <span className="text-2xl font-black text-primary">{snaResult.dominant!.score.toFixed(0)}</span>
+                  <span className="text-[10px] text-primary/50 font-bold">/ 100</span>
+                </div>
                 <p className="text-xs text-on-surface-variant leading-relaxed">{snaResult.dominant!.description}</p>
                 <p className="text-[10px] text-primary/70 font-medium mt-2">{snaResult.dominant!.detail}</p>
               </div>
@@ -274,9 +278,9 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                   </div>
                   {/* 산출 데이터 */}
                   <p className="text-[10px] text-on-surface-variant">{t.detail}</p>
-                  {/* 지표 쉬운 설명 */}
+                  {/* 지표 산출 방식 */}
                   <div className="pt-1 border-t border-outline/30">
-                    <p className="text-[10px] font-bold text-on-surface-variant/70 mb-0.5 uppercase tracking-widest">{t.metricName}이란?</p>
+                    <p className="text-[10px] font-bold text-on-surface-variant/70 mb-0.5 uppercase tracking-widest">{t.metricName} 점수 산출 방식</p>
                     <p className="text-[10px] text-on-surface-variant/80 leading-relaxed">{SNA_METRIC_EXPLANATIONS[t.type]}</p>
                   </div>
                 </div>
