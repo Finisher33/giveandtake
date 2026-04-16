@@ -163,6 +163,13 @@ function MedalBadge({ rank }: { rank: number }) {
   );
 }
 
+// ─── 유저 부제 헬퍼 ──────────────────────────────────────────────────────────
+
+function userSubtitle(user?: User | null): string {
+  if (!user) return '';
+  return [user.company, user.department, user.title].filter(Boolean).join(' · ');
+}
+
 // ─── 섹션 헤더 ────────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -247,7 +254,8 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
     const top10 = Object.entries(kwCounts).map(([id, data]) => {
       const total = data.givers + data.takers;
       const term = db.canonicalTerms?.find(t => t.id === id);
-      return { id, keyword: term ? term.term : id, ...data, giverRate: Math.round((data.givers / total) * 100), takerRate: Math.round((data.takers / total) * 100) };
+      const giverRate = total > 0 ? Math.round((data.givers / total) * 100) : 0;
+      return { id, keyword: term ? term.term : id, ...data, giverRate, takerRate: 100 - giverRate };
     }).sort((a, b) => b.count - a.count).slice(0, 10);
 
     const userKeywords: Record<string, Set<string>> = {};
@@ -490,7 +498,7 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
                       <span className="text-sm font-black text-primary">0{idx + 1}</span>
                     </div>
                     <div className="flex-1 flex items-center gap-3">
-                      <UserChip user={pair.user1} sub={pair.user1?.company} />
+                      <UserChip user={pair.user1} sub={userSubtitle(pair.user1)} />
                       <div className="flex flex-col items-center gap-1 px-3">
                         <div className="flex items-center gap-1">
                           {[...Array(Math.min(pair.weight, 6))].map((_, i) => (
@@ -499,7 +507,7 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
                         </div>
                         <span className="text-[9px] font-black text-secondary uppercase tracking-widest">{pair.weight} KW</span>
                       </div>
-                      <UserChip user={pair.user2} sub={pair.user2?.company} />
+                      <UserChip user={pair.user2} sub={userSubtitle(pair.user2)} />
                     </div>
                     <div className="flex flex-wrap gap-1 max-w-[200px]">
                       {pair.sharedKeywords.slice(0, 4).map((kw, ki) => (
@@ -554,7 +562,7 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
                   <Avatar user={networkStats.heavyUser?.user} size={48} />
                   <div>
                     <p className="text-xl font-black text-on-surface leading-tight">{networkStats.heavyUser?.user.name || 'N/A'}</p>
-                    <p className="text-[10px] text-on-surface-variant font-bold">{networkStats.heavyUser?.user.company}</p>
+                    <p className="text-[10px] text-on-surface-variant font-bold leading-snug">{userSubtitle(networkStats.heavyUser?.user)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-secondary font-bold">
@@ -611,8 +619,8 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
                           <div className="bg-primary h-full transition-all" style={{ width: `${item.giverRate}%` }} />
                           <div className="bg-secondary h-full transition-all" style={{ width: `${item.takerRate}%` }} />
                         </div>
-                        <span className="text-[10px] font-bold text-primary shrink-0">G {item.giverRate}%</span>
-                        <span className="text-[10px] font-bold text-secondary shrink-0">T {item.takerRate}%</span>
+                        <span className="text-[10px] font-bold text-primary shrink-0">Giver {item.giverRate}%</span>
+                        <span className="text-[10px] font-bold text-secondary shrink-0">Taker {item.takerRate}%</span>
                       </div>
                     </div>
                     <span className="text-lg font-black tabular-nums text-primary shrink-0">{item.count}<span className="text-sm font-bold text-on-surface-variant ml-0.5">명</span></span>
@@ -768,7 +776,7 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
                                 <span className="text-xs font-bold">{insight.likes?.length || 0}</span>
                               </div>
                             </div>
-                            <p className="text-[10px] text-on-surface-variant mb-1.5">{user?.company}{user?.title ? ` · ${user.title}` : ''}</p>
+                            <p className="text-[10px] text-on-surface-variant mb-1.5">{userSubtitle(user)}</p>
                             <p className="text-sm font-medium text-on-surface leading-relaxed italic line-clamp-3">"{insight.description}"</p>
                           </div>
                         </div>
@@ -803,7 +811,7 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
                     <Avatar user={comment.user} size={38} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-black text-on-surface leading-tight truncate">{comment.userName}</p>
-                      <p className="text-[10px] text-on-surface-variant/70 font-bold truncate">{comment.userCompany} · {comment.userTitle}</p>
+                      <p className="text-[10px] text-on-surface-variant/70 font-bold truncate">{userSubtitle(comment.user)}</p>
                     </div>
                     <div className="flex items-center gap-1.5 text-secondary shrink-0">
                       <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
@@ -855,13 +863,13 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
                   return (
                     <div key={req.id} className="bg-surface-container-low rounded-2xl p-6 space-y-4">
                       <div className="flex items-center gap-4">
-                        <UserChip user={fromUser} sub={fromUser?.title} />
+                        <UserChip user={fromUser} sub={userSubtitle(fromUser)} />
                         <div className="flex-1 flex items-center justify-center gap-2">
                           <div className="flex-1 h-px bg-outline/30" />
                           <span className="material-symbols-outlined text-primary text-sm">arrow_forward</span>
                           <div className="flex-1 h-px bg-outline/30" />
                         </div>
-                        <UserChip user={toUser} sub={toUser?.title} />
+                        <UserChip user={toUser} sub={userSubtitle(toUser)} />
                         <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-green-500/10 text-green-600 border border-green-500/25 shrink-0">accepted</span>
                       </div>
                       {req.message && (
@@ -916,7 +924,7 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
                         <div className="flex items-baseline justify-between gap-2 mb-1">
                           <div>
                             <span className="text-sm font-black text-on-surface">{user?.name || 'Anonymous'}</span>
-                            <span className="text-[10px] text-on-surface-variant ml-2">{user?.company}{user?.title ? ` · ${user.title}` : ''}</span>
+                            <span className="text-[10px] text-on-surface-variant ml-2">{userSubtitle(user)}</span>
                           </div>
                           <div className="flex items-center gap-1 text-secondary shrink-0">
                             <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
@@ -975,7 +983,7 @@ export default function TotalInsight({ courseId }: TotalInsightProps) {
                         <div className="flex items-baseline justify-between gap-2 mb-2">
                           <div>
                             <span className="text-sm font-black text-on-surface">{user?.name || 'Anonymous'}</span>
-                            <span className="text-[10px] text-on-surface-variant ml-2">{user?.company}{user?.department ? ` · ${user.department}` : ''}</span>
+                            <span className="text-[10px] text-on-surface-variant ml-2">{userSubtitle(user)}</span>
                           </div>
                           <span className={`text-[9px] font-black px-2.5 py-1 rounded-full shrink-0 ${interest.type === 'giver' ? 'bg-primary text-white' : 'bg-secondary text-on-secondary'}`}>
                             {interest.type === 'giver' ? '🙋 Giver' : '🤲 Taker'}
