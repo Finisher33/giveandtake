@@ -327,6 +327,7 @@ function TeaTimeUserCard({
   onRequest,
   index,
 }: {
+  key?: Key | null;
   user: User;
   allInterests: Interest[];
   myKws: Set<string>;
@@ -589,7 +590,7 @@ const MISSIONS: MissionConfig[] = [
       },
       {
         heading: '미션 방법',
-        body: '1. 매칭된 파트너를 확인하고 미리 LEADER LIBRARY에서 프로필을 살펴보세요.\n2. 점심 자리에서 상대방의 Giver 키워드에 관한 질문을 최소 2개 이상 나눠보세요.\n3. 대화에서 얻은 인사이트를 MY INSIGHT에 기록해보세요.',
+        body: '1. 매칭된 파트너를 확인하고 미리 LEADER LIBRARY에서 프로필을 살펴보세요.\n2. 점심 자리에서 상대방의 Giver 키워드에 관한 질문을 최소 2개 이상 나눠보세요.',
       },
       {
         heading: '미션 포인트',
@@ -613,7 +614,7 @@ const MISSIONS: MissionConfig[] = [
       },
       {
         heading: '미션 방법',
-        body: '1. 런치타임과 다른 파트너들로 구성된 나의 저녁 그룹을 확인하세요.\n2. 자신의 Giver 키워드를 중심으로 서로의 고민과 해결 경험을 나눠보세요.\n3. 교류회에서 나온 아이디어를 MY INSIGHT에 기록해보세요.',
+        body: '1. 런치타임과 다른 파트너들로 구성된 나의 저녁 그룹을 확인하세요.\n2. 자신의 Giver 키워드를 중심으로 서로의 고민과 해결 경험을 나눠보세요.',
       },
       {
         heading: '미션 포인트',
