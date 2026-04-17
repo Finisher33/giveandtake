@@ -112,10 +112,11 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
   
   const [transform, setTransform] = useState(d3.zoomIdentity);
 
-  // Get all users in the same course
+  // Get all users in the same course — 관심사를 등록한 유저만 표시
   const courseUsers = useMemo(() => {
-    return db.users.filter(u => u.courseId === effectiveCourseId);
-  }, [db.users, effectiveCourseId]);
+    const usersWithInterests = new Set(db.interests.map(i => i.userId));
+    return db.users.filter(u => u.courseId === effectiveCourseId && usersWithInterests.has(u.id));
+  }, [db.users, db.interests, effectiveCourseId]);
 
   // Get all interests for these users
   const courseInterests = useMemo(() => {
@@ -719,8 +720,10 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
 
               <div className="space-y-8">
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">volunteer_activism</span> be Giver
+                  <h4 className="flex items-center gap-1.5 min-w-0 overflow-hidden text-primary">
+                    <span className="material-symbols-outlined text-sm shrink-0">volunteer_activism</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest shrink-0">Giver</span>
+                    <span className="text-[9px] font-normal normal-case tracking-normal text-on-surface-variant truncate">· 도움을 드릴 수 있어요.</span>
                   </h4>
                   <div className="grid gap-3">
                     {selectedUserInterests.filter(i => i.type === 'giver').map(i => (
@@ -733,8 +736,10 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-secondary uppercase tracking-widest flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">pan_tool</span> be Taker
+                  <h4 className="flex items-center gap-1.5 min-w-0 overflow-hidden text-secondary">
+                    <span className="material-symbols-outlined text-sm shrink-0">pan_tool</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest shrink-0">Taker</span>
+                    <span className="text-[9px] font-normal normal-case tracking-normal text-on-surface-variant truncate">· 도움을 받고 싶어요.</span>
                   </h4>
                   <div className="grid gap-3">
                     {selectedUserInterests.filter(i => i.type === 'taker').map(i => (

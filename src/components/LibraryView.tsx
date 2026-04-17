@@ -81,16 +81,23 @@ function LibraryTeaTimeModal({
 }
 
 export default function LibraryView() {
-  const { db, currentUser, sendTeaTimeRequest, updateTeaTimeRequest } = useStore();
+  const { db, currentUser, sendTeaTimeRequest, updateTeaTimeRequest, fetchData } = useStore();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [replyingToReq, setReplyingToReq] = useState<TeaTimeRequest | null>(null);
   const [search, setSearch] = useState('');
   const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const courseUsers = useMemo(() =>
-    db.users.filter(u => u.courseId === currentUser?.courseId),
-    [db.users, currentUser]
-  );
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try { await fetchData(); } finally { setIsRefreshing(false); }
+  };
+
+  // 관심사를 등록한 유저만 표시
+  const courseUsers = useMemo(() => {
+    const usersWithInterests = new Set(db.interests.map((i: Interest) => i.userId));
+    return db.users.filter(u => u.courseId === currentUser?.courseId && usersWithInterests.has(u.id));
+  }, [db.users, db.interests, currentUser]);
 
   const myInterests = useMemo(() =>
     db.interests.filter(i => i.userId === currentUser?.id),
@@ -152,11 +159,21 @@ export default function LibraryView() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
-      <div className="pb-3 border-b-2 border-primary/30">
-        <h1 className="font-headline text-2xl font-black uppercase tracking-widest text-primary">LEADER LIBRARY</h1>
-        <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
-          이번 과정에 참여하는 모든 리더 · {courseUsers.length}명
-        </p>
+      <div className="pb-3 border-b-2 border-primary/30 flex items-center justify-between">
+        <div>
+          <h1 className="font-headline text-2xl font-black uppercase tracking-widest text-primary">LEADER LIBRARY</h1>
+          <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
+            관심사 등록 완료 리더 · {courseUsers.length}명
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className={`w-9 h-9 rounded-full bg-white border border-outline flex items-center justify-center shadow-sm hover:bg-surface-container-low transition-all ${isRefreshing ? 'opacity-50' : ''}`}
+          title="새로고침"
+        >
+          <span className={`material-symbols-outlined text-on-surface-variant text-lg ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
+        </button>
       </div>
 
       {/* Search */}
@@ -288,35 +305,67 @@ export default function LibraryView() {
                 {/* Keywords */}
                 {uInterests.length > 0 ? (
                   <div className="space-y-2 flex-1">
-                    {givers.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-[9px] font-bold text-primary uppercase tracking-widest">Giver</p>
-                        <div className="space-y-1">
-                          {givers.map((i: Interest) => (
-                            <div key={i.id} className="bg-primary/5 border border-primary/15 rounded-lg px-2.5 py-1.5">
-                              <p className="text-[10px] font-bold text-primary">#{i.keyword}</p>
-                              {i.description && (
-                                <p className="text-[9px] text-on-surface-variant leading-relaxed mt-0.5 line-clamp-2">{i.description}</p>
-                              )}
+                    {selectedKeyword ? (
+                      /* 필터 선택 시: 해당 키워드 관심사만 Giver/Taker 라벨과 함께 표시 */
+                      (() => {
+                        const matched = uInterests.filter((i: Interest) => i.keyword.trim() === selectedKeyword);
+                        return matched.map((i: Interest) => (
+                          <div key={i.id} className={`border rounded-lg px-2.5 py-1.5 ${i.type === 'giver' ? 'bg-primary/5 border-primary/15' : 'bg-secondary/5 border-secondary/15'}`}>
+                            <div className="flex items-center gap-1.5 mb-0.5 min-w-0 overflow-hidden">
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0 ${i.type === 'giver' ? 'bg-primary text-on-primary' : 'bg-secondary text-on-secondary'}`}>
+                                {i.type === 'giver' ? 'Giver' : 'Taker'}
+                              </span>
+                              <span className={`text-[8px] font-normal text-on-surface-variant truncate`}>
+                                · {i.type === 'giver' ? '도움을 드릴 수 있어요.' : '도움을 받고 싶어요.'}
+                              </span>
+                              <p className={`text-[10px] font-bold shrink-0 ml-auto ${i.type === 'giver' ? 'text-primary' : 'text-secondary'}`}>#{i.keyword}</p>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {takers.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-[9px] font-bold text-secondary uppercase tracking-widest">Taker</p>
-                        <div className="space-y-1">
-                          {takers.map((i: Interest) => (
-                            <div key={i.id} className="bg-secondary/5 border border-secondary/15 rounded-lg px-2.5 py-1.5">
-                              <p className="text-[10px] font-bold text-secondary">#{i.keyword}</p>
-                              {i.description && (
-                                <p className="text-[9px] text-on-surface-variant leading-relaxed mt-0.5 line-clamp-2">{i.description}</p>
-                              )}
+                            {i.description && (
+                              <p className="text-[9px] text-on-surface-variant leading-relaxed line-clamp-2">{i.description}</p>
+                            )}
+                          </div>
+                        ));
+                      })()
+                    ) : (
+                      /* 필터 없음: 모든 관심사 표시 */
+                      <>
+                        {givers.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                              <p className="text-[9px] font-bold text-primary uppercase tracking-widest shrink-0">Giver</p>
+                              <p className="text-[8px] font-normal text-on-surface-variant truncate">· 도움을 드릴 수 있어요.</p>
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                            <div className="space-y-1">
+                              {givers.map((i: Interest) => (
+                                <div key={i.id} className="bg-primary/5 border border-primary/15 rounded-lg px-2.5 py-1.5">
+                                  <p className="text-[10px] font-bold text-primary">#{i.keyword}</p>
+                                  {i.description && (
+                                    <p className="text-[9px] text-on-surface-variant leading-relaxed mt-0.5 line-clamp-2">{i.description}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {takers.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                              <p className="text-[9px] font-bold text-secondary uppercase tracking-widest shrink-0">Taker</p>
+                              <p className="text-[8px] font-normal text-on-surface-variant truncate">· 도움을 받고 싶어요.</p>
+                            </div>
+                            <div className="space-y-1">
+                              {takers.map((i: Interest) => (
+                                <div key={i.id} className="bg-secondary/5 border border-secondary/15 rounded-lg px-2.5 py-1.5">
+                                  <p className="text-[10px] font-bold text-secondary">#{i.keyword}</p>
+                                  {i.description && (
+                                    <p className="text-[9px] text-on-surface-variant leading-relaxed mt-0.5 line-clamp-2">{i.description}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ) : (
