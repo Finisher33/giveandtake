@@ -63,18 +63,32 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
   const [givers, setGivers] = useState(() => {
     const base = initialGivers.map(g => ({
       ...g,
-      isCustom: g.keyword !== '' && !presetKeywords.includes(g.keyword)
+      isCustom: g.keyword !== '' && !presetKeywords.includes(g.keyword),
+      keywordGroup: '' as 'work' | 'hobby' | '',
     }));
-    return base.length >= 2 ? base : [...base, ...Array.from({ length: 2 - base.length }, () => ({ keyword: '', description: '', isCustom: false }))];
+    return base.length >= 2 ? base : [...base, ...Array.from({ length: 2 - base.length }, () => ({ keyword: '', description: '', isCustom: false, keywordGroup: '' as 'work' | 'hobby' | '' }))];
   });
 
   const [takers, setTakers] = useState(() => {
     const base = initialTakers.map(t => ({
       ...t,
-      isCustom: t.keyword !== '' && !presetKeywords.includes(t.keyword)
+      isCustom: t.keyword !== '' && !presetKeywords.includes(t.keyword),
+      keywordGroup: '' as 'work' | 'hobby' | '',
     }));
-    return base.length >= 2 ? base : [...base, ...Array.from({ length: 2 - base.length }, () => ({ keyword: '', description: '', isCustom: false }))];
+    return base.length >= 2 ? base : [...base, ...Array.from({ length: 2 - base.length }, () => ({ keyword: '', description: '', isCustom: false, keywordGroup: '' as 'work' | 'hobby' | '' }))];
   });
+
+  const sortedWorkPresets = useMemo(() => {
+    return [...db.presetInterests]
+      .filter(p => (p.group ?? 'work') === 'work')
+      .sort((a, b) => a.keyword.localeCompare(b.keyword));
+  }, [db.presetInterests]);
+
+  const sortedHobbyPresets = useMemo(() => {
+    return [...db.presetInterests]
+      .filter(p => p.group === 'hobby')
+      .sort((a, b) => a.keyword.localeCompare(b.keyword));
+  }, [db.presetInterests]);
 
   const sortedPresetInterests = useMemo(() => {
     return [...db.presetInterests].sort((a, b) => a.keyword.localeCompare(b.keyword));
@@ -127,22 +141,22 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
 
       alert('프로필이 업데이트 되었습니다.');
       onSave();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save profile:", error);
-      alert('프로필 저장 중 오류가 발생했습니다. 권한 설정을 확인해 주세요.');
+      alert(error?.message || '프로필 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const addGiver = () => {
-    if (givers.length < 5) setGivers([...givers, { keyword: '', description: '', isCustom: false }]);
+    if (givers.length < 5) setGivers([...givers, { keyword: '', description: '', isCustom: false, keywordGroup: '' as 'work' | 'hobby' | '' }]);
   };
   const removeGiver = (idx: number) => {
     if (givers.length > 2) setGivers(givers.filter((_, i) => i !== idx));
   };
   const addTaker = () => {
-    if (takers.length < 5) setTakers([...takers, { keyword: '', description: '', isCustom: false }]);
+    if (takers.length < 5) setTakers([...takers, { keyword: '', description: '', isCustom: false, keywordGroup: '' as 'work' | 'hobby' | '' }]);
   };
   const removeTaker = (idx: number) => {
     if (takers.length > 2) setTakers(takers.filter((_, i) => i !== idx));
@@ -280,8 +294,10 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
           {/* Giver Section */}
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-primary/20 pb-2">
-              <h3 className="text-lg font-headline font-bold text-primary flex items-center gap-2">
-                <span className="material-symbols-outlined">volunteer_activism</span> be Giver
+              <h3 className="flex items-center gap-2 min-w-0 overflow-hidden text-primary">
+                <span className="material-symbols-outlined shrink-0">volunteer_activism</span>
+                <span className="text-base font-headline font-bold shrink-0">Giver</span>
+                <span className="text-xs font-normal text-on-surface-variant truncate">· 도움을 드릴 수 있어요.</span>
               </h3>
               {givers.length < 5 && (
                 <button 
@@ -310,10 +326,38 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                     </button>
                   </div>
                   <div className="space-y-3">
+                    {/* 키워드 유형 선택 */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1">키워드 유형</label>
+                      <div className="flex gap-2">
+                        {([
+                          { key: '' as const, label: '전체' },
+                          { key: 'work' as const, label: '💼 업무' },
+                          { key: 'hobby' as const, label: '🎨 취미' },
+                        ] as { key: 'work' | 'hobby' | ''; label: string }[]).map(opt => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => {
+                              const next = [...givers];
+                              next[idx] = { ...next[idx], keywordGroup: opt.key, keyword: '', isCustom: false };
+                              setGivers(next);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                              g.keywordGroup === opt.key
+                                ? 'bg-primary text-on-primary border-primary'
+                                : 'bg-surface text-on-surface-variant border-outline hover:border-primary/50'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1">키워드 선택</label>
-                    <div className="bg-surface border border-outline rounded-xl flex items-center relative">
-                        <select 
+                      <div className="bg-surface border border-outline rounded-xl flex items-center relative">
+                        <select
                           value={g.isCustom ? '직접입력' : g.keyword}
                           onChange={e => {
                             const val = e.target.value;
@@ -329,7 +373,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                         >
                           <option value="">관심사를 선택하세요</option>
                           <option value="직접입력">직접입력</option>
-                          {sortedPresetInterests.map(p => (
+                          {(g.keywordGroup === 'work' ? sortedWorkPresets : g.keywordGroup === 'hobby' ? sortedHobbyPresets : sortedPresetInterests).map(p => (
                             <option key={p.id} value={p.keyword}>{p.keyword}</option>
                           ))}
                         </select>
@@ -339,9 +383,9 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                     {g.isCustom && (
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1">키워드 직접 입력</label>
-                        <input 
-                          type="text" 
-                          value={g.keyword} 
+                        <input
+                          type="text"
+                          value={g.keyword}
                           onChange={e => {
                             const next = [...givers];
                             next[idx] = { ...next[idx], keyword: e.target.value };
@@ -354,7 +398,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                     )}
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1">상세 내용</label>
-                      <textarea 
+                      <textarea
                         value={g.description}
                         onChange={e => {
                           const next = [...givers];
@@ -375,8 +419,10 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
           {/* Taker Section */}
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-secondary/20 pb-2">
-              <h3 className="text-lg font-headline font-bold text-secondary flex items-center gap-2">
-                <span className="material-symbols-outlined">pan_tool</span> be Taker
+              <h3 className="flex items-center gap-2 min-w-0 overflow-hidden text-secondary">
+                <span className="material-symbols-outlined shrink-0">pan_tool</span>
+                <span className="text-base font-headline font-bold shrink-0">Taker</span>
+                <span className="text-xs font-normal text-on-surface-variant truncate">· 도움을 받고 싶어요.</span>
               </h3>
               {takers.length < 5 && (
                 <button 
@@ -405,10 +451,38 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                     </button>
                   </div>
                   <div className="space-y-3">
+                    {/* 키워드 유형 선택 */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1">키워드 유형</label>
+                      <div className="flex gap-2">
+                        {([
+                          { key: '' as const, label: '전체' },
+                          { key: 'work' as const, label: '💼 업무' },
+                          { key: 'hobby' as const, label: '🎨 취미' },
+                        ] as { key: 'work' | 'hobby' | ''; label: string }[]).map(opt => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => {
+                              const next = [...takers];
+                              next[idx] = { ...next[idx], keywordGroup: opt.key, keyword: '', isCustom: false };
+                              setTakers(next);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                              t.keywordGroup === opt.key
+                                ? 'bg-secondary text-on-secondary border-secondary'
+                                : 'bg-surface text-on-surface-variant border-outline hover:border-secondary/50'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1">키워드 선택</label>
-                    <div className="bg-surface border border-outline rounded-xl flex items-center relative">
-                        <select 
+                      <div className="bg-surface border border-outline rounded-xl flex items-center relative">
+                        <select
                           value={t.isCustom ? '직접입력' : t.keyword}
                           onChange={e => {
                             const val = e.target.value;
@@ -424,7 +498,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                         >
                           <option value="">관심사를 선택하세요</option>
                           <option value="직접입력">직접입력</option>
-                          {sortedPresetInterests.map(p => (
+                          {(t.keywordGroup === 'work' ? sortedWorkPresets : t.keywordGroup === 'hobby' ? sortedHobbyPresets : sortedPresetInterests).map(p => (
                             <option key={p.id} value={p.keyword}>{p.keyword}</option>
                           ))}
                         </select>
@@ -434,9 +508,9 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                     {t.isCustom && (
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1">키워드 직접 입력</label>
-                        <input 
-                          type="text" 
-                          value={t.keyword} 
+                        <input
+                          type="text"
+                          value={t.keyword}
                           onChange={e => {
                             const next = [...takers];
                             next[idx] = { ...next[idx], keyword: e.target.value };
@@ -449,7 +523,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                     )}
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1">상세 내용</label>
-                      <textarea 
+                      <textarea
                         value={t.description}
                         onChange={e => {
                           const next = [...takers];

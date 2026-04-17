@@ -1,46 +1,32 @@
 import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { getEmbedding, cosineSimilarity } from './services/embeddingService';
-import { db as firestore, auth, authReady } from './firebase';
-import { doc, onSnapshot, setDoc, getDoc, getDocFromServer, collection, deleteDoc, writeBatch, query, where, getDocs } from 'firebase/firestore';
+import { db as firestore, auth, authReady, ensureAuth } from './firebase';
+import { doc, onSnapshot, setDoc, getDoc, collection, deleteDoc, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { generateMockData } from './utils/mockData';
 
-// Firestore 에러 핸들링을 위한 인터페이스 및 함수 (Error handling for Firestore)
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
+// Firebase 에러 코드를 사용자 친화적 메시지로 변환하고 디버그 로그를 남긴다.
+function translateFirestoreError(error: any, path: string | null): Error {
+  const code = error?.code || '';
+  const rawMessage = error instanceof Error ? error.message : String(error);
 
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-  }
-}
-
-function handleFirestoreError(error: any, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+  console.error('Firestore Error:', JSON.stringify({
+    error: rawMessage,
+    code,
+    path,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  // 에러를 다시 던져서 UI에서 잡을 수 있게 합니다.
-  throw new Error(JSON.stringify(errInfo));
+    }
+  }));
+
+  if (rawMessage === 'AUTH_FAILED')            return new Error('인증에 실패했습니다. 페이지를 새로고침 후 다시 시도해 주세요.');
+  if (code === 'permission-denied')            return new Error('저장 권한이 없습니다. 페이지를 새로고침 후 다시 시도해 주세요.');
+  if (code === 'unauthenticated')              return new Error('인증이 필요합니다. 페이지를 새로고침 후 다시 시도해 주세요.');
+  if (code === 'not-found')                    return new Error('데이터를 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.');
+  if (code === 'unavailable' || code === 'deadline-exceeded') return new Error('네트워크 연결을 확인하고 다시 시도해 주세요.');
+  if (code === 'resource-exhausted')           return new Error('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
+  return new Error('오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
 }
 
 export interface Course {
@@ -110,6 +96,7 @@ export interface CanonicalTerm {
 export interface PresetInterest {
   id: string;
   keyword: string;
+  group: 'work' | 'hobby';
 }
 
 export interface MissionGroup {
@@ -171,7 +158,7 @@ interface StoreContextType {
   saveUserInsight: (insight: UserInsight) => Promise<void>;
   toggleInsightLike: (insightId: string, userId: string) => Promise<void>;
   fetchData: () => Promise<void>;
-  addPresetInterest: (keyword: string) => Promise<void>;
+  addPresetInterest: (keyword: string, group: 'work' | 'hobby') => Promise<void>;
   deletePresetInterest: (id: string) => Promise<void>;
   saveMissionGroups: (group: MissionGroup) => Promise<void>;
   deleteMissionGroup: (groupId: string) => Promise<void>;
@@ -286,11 +273,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const setupListeners = () => {
       const handleError = (error: any, collectionName: string) => {
-        try {
-          handleFirestoreError(error, OperationType.LIST, collectionName);
-        } catch (e) {
-          // Ignore throw in background listener to allow checkAllLoaded to run
-        }
+        console.error('Firestore listener error:', JSON.stringify({
+          error: error instanceof Error ? error.message : String(error),
+          code: error?.code,
+          collection: collectionName,
+        }));
         checkAllLoaded(collectionName);
       };
 
@@ -465,12 +452,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDemoUser(user);
       return;
     }
+    await ensureAuth();
     try {
       await setDoc(doc(firestore, 'users', user.id), sanitize(user));
       setCurrentUser(user);
       localStorage.setItem('currentUser', JSON.stringify(user));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${user.id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `users/${user.id}`);
     }
   };
 
@@ -488,10 +476,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDemoDb(prev => ({ ...prev, courses: [...prev.courses, course] }));
       return;
     }
+    await ensureAuth();
     try {
       await setDoc(doc(firestore, 'courses', course.id), sanitize(course));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `courses/${course.id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `courses/${course.id}`);
     }
   };
 
@@ -500,10 +489,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDemoDb(prev => ({ ...prev, courses: prev.courses.map(c => c.id === course.id ? course : c) }));
       return;
     }
+    await ensureAuth();
     try {
       await setDoc(doc(firestore, 'courses', course.id), sanitize(course));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `courses/${course.id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `courses/${course.id}`);
     }
   };
 
@@ -517,6 +507,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }));
       return;
     }
+    await ensureAuth();
     try {
       console.log(`Starting deletion for course: ${id}`);
       let batch = writeBatch(firestore);
@@ -605,7 +596,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (errorCode === 'not-found') {
         throw new Error('삭제할 과정을 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.');
       }
-      handleFirestoreError(error, OperationType.DELETE, `courses/${id}`);
+      throw translateFirestoreError(error, `courses/${id}`);
     }
   };
 
@@ -621,6 +612,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }));
       return;
     }
+    await ensureAuth();
     try {
       console.log(`Starting reset for course: ${courseId}`);
       
@@ -694,9 +686,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       await commitBatch();
       console.log("Reset complete.");
-    } catch (error) {
-      console.error("Error resetting course data:", error);
-      handleFirestoreError(error, OperationType.DELETE, `courseData/${courseId}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `courseData/${courseId}`);
     }
   };
 
@@ -705,11 +696,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDemoDb(prev => ({ ...prev, sessions: [...prev.sessions, session] }));
       return;
     }
+    await ensureAuth();
     try {
       const data = { ...session, isActive: session.isActive ?? true };
       await setDoc(doc(firestore, 'sessions', session.id), sanitize(data));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `sessions/${session.id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `sessions/${session.id}`);
     }
   };
 
@@ -718,10 +710,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDemoDb(prev => ({ ...prev, sessions: prev.sessions.map(s => s.id === session.id ? session : s) }));
       return;
     }
+    await ensureAuth();
     try {
       await setDoc(doc(firestore, 'sessions', session.id), sanitize(session));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `sessions/${session.id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `sessions/${session.id}`);
     }
   };
 
@@ -733,13 +726,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }));
       return;
     }
+    await ensureAuth();
     try {
       const session = sessions.find(s => s.id === id);
       if (session) {
         await setDoc(doc(firestore, 'sessions', id), sanitize({ ...session, isActive: !session.isActive }));
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `sessions/${id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `sessions/${id}`);
     }
   };
 
@@ -789,23 +783,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDemoDb(prev => ({ ...prev, userInsights: [...prev.userInsights, insight] }));
       return;
     }
+    await ensureAuth();
     try {
       const { canonicalId, term, embedding } = await canonicalizeKeyword(insight.keyword);
-      
       const batch = writeBatch(firestore);
-      
-      // Update canonical terms if new
       if (!canonicalTerms.find(t => t.id === canonicalId)) {
         batch.set(doc(firestore, 'canonicalTerms', canonicalId), sanitize({ id: canonicalId, term, embedding }));
       }
-
-      const data = { ...insight, canonicalId, likes: insight.likes || [] };
-      batch.set(doc(firestore, 'userInsights', insight.id), sanitize(data));
-      
+      batch.set(doc(firestore, 'userInsights', insight.id), sanitize({ ...insight, canonicalId, likes: insight.likes || [] }));
       await batch.commit();
-    } catch (error) {
-      console.error("Error saving insight:", error);
-      await setDoc(doc(firestore, 'userInsights', insight.id), sanitize({ ...insight, likes: insight.likes || [] }));
+    } catch (error: any) {
+      // canonicalization 또는 batch 실패 시 canonicalId 없이 단순 저장으로 fallback
+      try {
+        await setDoc(doc(firestore, 'userInsights', insight.id), sanitize({ ...insight, likes: insight.likes || [] }));
+      } catch (fallbackError: any) {
+        throw translateFirestoreError(fallbackError, `userInsights/${insight.id}`);
+      }
     }
   };
 
@@ -824,6 +817,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }));
       return;
     }
+    await ensureAuth();
     try {
       const insight = userInsights.find(i => i.id === insightId);
       if (insight) {
@@ -833,8 +827,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           : [...likes, userId];
         await setDoc(doc(firestore, 'userInsights', insightId), sanitize({ ...insight, likes: newLikes }));
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `userInsights/${insightId}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `userInsights/${insightId}`);
     }
   };
 
@@ -843,10 +837,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDemoDb(prev => ({ ...prev, sessions: prev.sessions.filter(s => s.id !== id) }));
       return;
     }
+    await ensureAuth();
     try {
       await deleteDoc(doc(firestore, 'sessions', id));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `sessions/${id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `sessions/${id}`);
     }
   };
 
@@ -858,32 +853,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
       return;
     }
+    await ensureAuth();
     try {
       const batch = writeBatch(firestore);
-      
+
       // 1. Delete old interests for this user
       if (currentUser) {
         const oldInterests = interests.filter(i => i.userId === currentUser.id);
         oldInterests.forEach(i => batch.delete(doc(firestore, 'interests', i.id)));
       }
 
-      // 2. Canonicalize and add new interests
+      // 2. Canonicalize and add new — canonicalization 실패 시 canonicalId 없이 저장
       for (const i of interestsToSave) {
-        const { canonicalId, term, embedding } = await canonicalizeKeyword(i.keyword);
-        
-        if (!canonicalTerms.find(t => t.id === canonicalId)) {
-          batch.set(doc(firestore, 'canonicalTerms', canonicalId), sanitize({ id: canonicalId, term, embedding }));
+        try {
+          const { canonicalId, term, embedding } = await canonicalizeKeyword(i.keyword);
+          if (!canonicalTerms.find(t => t.id === canonicalId)) {
+            batch.set(doc(firestore, 'canonicalTerms', canonicalId), sanitize({ id: canonicalId, term, embedding }));
+          }
+          batch.set(doc(firestore, 'interests', i.id), sanitize({ ...i, canonicalId }));
+        } catch {
+          batch.set(doc(firestore, 'interests', i.id), sanitize(i));
         }
-        
-        batch.set(doc(firestore, 'interests', i.id), sanitize({ ...i, canonicalId }));
       }
 
       await batch.commit();
-    } catch (error) {
-      console.error("Error saving interests:", error);
-      const batch = writeBatch(firestore);
-      interestsToSave.forEach(i => batch.set(doc(firestore, 'interests', i.id), sanitize(i)));
-      await batch.commit();
+    } catch (error: any) {
+      throw translateFirestoreError(error, 'interests');
     }
   };
 
@@ -893,14 +888,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (demoUser?.id === user.id) setDemoUser(user);
       return;
     }
+    await ensureAuth();
     try {
       await setDoc(doc(firestore, 'users', user.id), sanitize(user));
       if (currentUser?.id === user.id) {
         setCurrentUser(user);
         localStorage.setItem('currentUser', JSON.stringify(user));
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${user.id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `users/${user.id}`);
     }
   };
 
@@ -917,9 +913,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (demoUser?.id === user.id) setDemoUser(user);
       return;
     }
+    await ensureAuth();
     try {
       const batch = writeBatch(firestore);
-      
+
       // 1. Update User
       batch.set(doc(firestore, 'users', user.id), sanitize(user));
 
@@ -928,24 +925,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const oldInterests = interests.filter(i => i.userId === user.id);
       oldInterests.forEach(i => batch.delete(doc(firestore, 'interests', i.id)));
 
-      // Add new with canonicalization
+      // Add new — canonicalization 실패 시 canonicalId 없이 저장 (fallback)
       for (const i of newInterests) {
-        const { canonicalId, term, embedding } = await canonicalizeKeyword(i.keyword);
-        if (!canonicalTerms.find(t => t.id === canonicalId)) {
-          batch.set(doc(firestore, 'canonicalTerms', canonicalId), sanitize({ id: canonicalId, term, embedding }));
+        try {
+          const { canonicalId, term, embedding } = await canonicalizeKeyword(i.keyword);
+          if (!canonicalTerms.find(t => t.id === canonicalId)) {
+            batch.set(doc(firestore, 'canonicalTerms', canonicalId), sanitize({ id: canonicalId, term, embedding }));
+          }
+          batch.set(doc(firestore, 'interests', i.id), sanitize({ ...i, canonicalId }));
+        } catch {
+          batch.set(doc(firestore, 'interests', i.id), sanitize(i));
         }
-        batch.set(doc(firestore, 'interests', i.id), sanitize({ ...i, canonicalId }));
       }
 
       await batch.commit();
-      
+
       if (currentUser?.id === user.id) {
         setCurrentUser(user);
         localStorage.setItem('currentUser', JSON.stringify(user));
       }
-    } catch (error) {
-      console.error("Error updating user profile:", error);
-      handleFirestoreError(error, OperationType.WRITE, `users/${user.id}`);
+    } catch (error: any) {
+      console.error("Error updating user profile:", JSON.stringify({
+        error: error instanceof Error ? error.message : String(error),
+        code: error?.code,
+        authInfo: { userId: auth.currentUser?.uid, isAnonymous: auth.currentUser?.isAnonymous },
+        path: `users/${user.id}`
+      }));
+
+      const code = error?.code || '';
+      if (error?.message === 'AUTH_FAILED') {
+        throw new Error('인증에 실패했습니다. 페이지를 새로고침 후 다시 시도해 주세요.');
+      }
+      if (code === 'permission-denied') {
+        throw new Error('저장 권한이 없습니다. 페이지를 새로고침 후 다시 시도해 주세요.');
+      }
+      if (code === 'unavailable' || code === 'deadline-exceeded') {
+        throw new Error('네트워크 연결을 확인하고 다시 시도해 주세요.');
+      }
+      throw new Error('프로필 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
     }
   };
 
@@ -960,6 +977,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }));
       return;
     }
+    await ensureAuth();
     try {
       const batch = writeBatch(firestore);
       
@@ -972,8 +990,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       teaTimeRequests.filter(r => r.fromUserId === id || r.toUserId === id).forEach(r => batch.delete(doc(firestore, 'teaTimeRequests', r.id)));
       
       await batch.commit();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `users/${id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `users/${id}`);
     }
   };
 
@@ -982,10 +1000,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDemoDb(prev => ({ ...prev, teaTimeRequests: [...prev.teaTimeRequests, req] }));
       return;
     }
+    await ensureAuth();
     try {
       await setDoc(doc(firestore, 'teaTimeRequests', req.id), sanitize(req));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `teaTimeRequests/${req.id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `teaTimeRequests/${req.id}`);
     }
   };
 
@@ -997,26 +1016,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }));
       return;
     }
+    await ensureAuth();
     try {
       const req = teaTimeRequests.find(r => r.id === id);
       if (req) {
         await setDoc(doc(firestore, 'teaTimeRequests', id), sanitize({ ...req, status, responseMessage }));
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `teaTimeRequests/${id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `teaTimeRequests/${id}`);
     }
   };
 
-  const addPresetInterest = async (keyword: string) => {
+  const addPresetInterest = async (keyword: string, group: 'work' | 'hobby') => {
     if (isDemoMode) {
-      setDemoDb(prev => ({ ...prev, presetInterests: [...prev.presetInterests, { id: Date.now().toString(), keyword }] }));
+      setDemoDb(prev => ({ ...prev, presetInterests: [...prev.presetInterests, { id: Date.now().toString(), keyword, group }] }));
       return;
     }
+    await ensureAuth();
     try {
       const id = Date.now().toString();
-      await setDoc(doc(firestore, 'presetInterests', id), sanitize({ id, keyword }));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `presetInterests/${keyword}`);
+      await setDoc(doc(firestore, 'presetInterests', id), sanitize({ id, keyword, group }));
+    } catch (error: any) {
+      throw translateFirestoreError(error, `presetInterests/${keyword}`);
     }
   };
 
@@ -1025,10 +1046,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDemoDb(prev => ({ ...prev, presetInterests: prev.presetInterests.filter(p => p.id !== id) }));
       return;
     }
+    await ensureAuth();
     try {
       await deleteDoc(doc(firestore, 'presetInterests', id));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `presetInterests/${id}`);
+    } catch (error: any) {
+      throw translateFirestoreError(error, `presetInterests/${id}`);
     }
   };
 
@@ -1046,15 +1068,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   });
 
   const deleteMissionGroup = async (groupId: string) => {
+    await ensureAuth();
     try {
       await deleteDoc(doc(firestore, 'missionGroups', groupId));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `missionGroups/${groupId}`);
-      throw error;
+    } catch (error: any) {
+      throw translateFirestoreError(error, `missionGroups/${groupId}`);
     }
   };
 
   const saveMissionGroups = async (group: MissionGroup) => {
+    await ensureAuth();
     try {
       // 중첩 배열 → 각 그룹을 JSON 문자열로 직렬화
       const firestoreData = {
@@ -1062,9 +1085,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         groups: group.groups.map(g => JSON.stringify(g)),
       };
       await setDoc(doc(firestore, 'missionGroups', group.id), sanitize(firestoreData));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `missionGroups/${group.id}`);
-      throw error; // 호출자(handleConfirmMatch)가 에러를 인지할 수 있도록 re-throw
+    } catch (error: any) {
+      throw translateFirestoreError(error, `missionGroups/${group.id}`);
     }
   };
 

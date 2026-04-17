@@ -33,6 +33,7 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
   const [adminSubView, setAdminSubView] = useState<'management' | 'analysis' | 'users' | 'presets'>('management');
   
   const [newPresetKeyword, setNewPresetKeyword] = useState('');
+  const [presetGroupTab, setPresetGroupTab] = useState<'work' | 'hobby'>('work');
   
   // Analysis State
   const [analysisCourseId, setAnalysisCourseId] = useState('');
@@ -154,9 +155,7 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
       setCourseToDelete(null);
       showStatus('success', '과정이 삭제되었습니다.');
     } catch (e: any) {
-      const reason = e?.message || '알 수 없는 오류';
-      showStatus('error', `과정 삭제에 실패했습니다: ${reason}`);
-      console.error('과정 삭제 실패:', e);
+      showStatus('error', e?.message || '과정 삭제에 실패했습니다.');
     } finally {
       setIsProcessing(false);
     }
@@ -611,7 +610,7 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
     if (!newPresetKeyword.trim()) return;
     setIsProcessing(true);
     try {
-      await addPresetInterest(newPresetKeyword.trim());
+      await addPresetInterest(newPresetKeyword.trim(), presetGroupTab);
       setNewPresetKeyword('');
       showStatus('success', '키워드가 추가되었습니다.');
     } catch (e) {
@@ -1391,26 +1390,52 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
             </div>
           </div>
         ) : adminSubView === 'presets' ? (
-          <div className="space-y-12">
+          <div className="space-y-8">
             <div>
               <h1 className="font-headline text-2xl sm:text-3xl font-bold text-on-surface mb-2">관심사 키워드 관리</h1>
-              <p className="text-on-surface-variant text-xs sm:text-sm">유저가 프로필에서 선택할 수 있는 기본 관심사 키워드를 관리합니다.</p>
+              <p className="text-on-surface-variant text-xs sm:text-sm">유저가 프로필에서 선택할 수 있는 기본 관심사 키워드를 그룹별로 관리합니다.</p>
+            </div>
+
+            {/* 그룹 탭 */}
+            <div className="flex gap-2">
+              {([
+                { key: 'work', label: '💼 업무 관련 관심사', count: db.presetInterests.filter(p => (p.group ?? 'work') === 'work').length },
+                { key: 'hobby', label: '🎨 취미 관련 관심사', count: db.presetInterests.filter(p => p.group === 'hobby').length },
+              ] as { key: 'work' | 'hobby'; label: string; count: number }[]).map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => { setPresetGroupTab(tab.key); setNewPresetKeyword(''); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${
+                    presetGroupTab === tab.key
+                      ? 'bg-primary text-on-primary border-primary shadow-sm'
+                      : 'bg-surface text-on-surface-variant border-outline hover:border-primary/50 hover:text-primary'
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${presetGroupTab === tab.key ? 'bg-white/20 text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
             </div>
 
             <div className="bg-white p-6 sm:p-8 rounded-xl border border-outline shadow-sm space-y-8">
+              {/* 키워드 추가 입력 */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1 space-y-2">
-                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest px-1">새 키워드 추가</label>
-                  <input 
-                    type="text" 
+                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest px-1">
+                    새 키워드 추가 · {presetGroupTab === 'work' ? '업무 관련' : '취미 관련'}
+                  </label>
+                  <input
+                    type="text"
                     value={newPresetKeyword}
                     onChange={(e) => setNewPresetKeyword(e.target.value)}
-                    placeholder="예: AI 활용, 리더십, 데이터 분석"
+                    placeholder={presetGroupTab === 'work' ? '예: AI 활용, 리더십, 데이터 분석' : '예: 독서, 등산, 요리'}
                     className="w-full bg-surface-container-low border border-outline rounded-lg px-4 py-3 text-sm sm:text-base text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
                     onKeyDown={(e) => e.key === 'Enter' && handleAddPreset()}
                   />
                 </div>
-                <button 
+                <button
                   onClick={handleAddPreset}
                   disabled={isProcessing || !newPresetKeyword.trim()}
                   className="sm:mt-7 px-8 py-3 bg-primary text-on-primary font-black rounded-lg flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-primary/90 transition-all disabled:opacity-50"
@@ -1419,29 +1444,40 @@ export default function AdminView({ onBack, onLogout }: { onBack: () => void, on
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest px-1">등록된 키워드 목록 ({db.presetInterests.length})</h3>
-                <div className="flex flex-wrap gap-2">
-                  {[...db.presetInterests].sort((a, b) => a.keyword.localeCompare(b.keyword)).map(preset => (
-                    <div 
-                      key={preset.id} 
-                      className="group flex items-center gap-2 px-4 py-2 bg-surface-container-high border border-outline/30 rounded-full hover:border-error/50 transition-all"
-                    >
-                      <span className="text-sm font-bold text-on-surface">{preset.keyword}</span>
-                      <button 
-                        onClick={() => handleDeletePreset(preset.id)}
-                        className="w-5 h-5 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-error hover:text-white transition-all opacity-0 group-hover:opacity-100"
-                        title="삭제"
-                      >
-                        <span className="material-symbols-outlined text-xs">close</span>
-                      </button>
+              {/* 그룹별 키워드 목록 */}
+              {(['work', 'hobby'] as const).map(grp => {
+                const groupPresets = [...db.presetInterests]
+                  .filter(p => (p.group ?? 'work') === grp)
+                  .sort((a, b) => a.keyword.localeCompare(b.keyword));
+                if (presetGroupTab !== grp) return null;
+                return (
+                  <div key={grp} className="space-y-4">
+                    <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest px-1">
+                      {grp === 'work' ? '💼 업무 관련 관심사' : '🎨 취미 관련 관심사'} ({groupPresets.length})
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {groupPresets.map(preset => (
+                        <div
+                          key={preset.id}
+                          className="group flex items-center gap-2 px-4 py-2 bg-surface-container-high border border-outline/30 rounded-full hover:border-error/50 transition-all"
+                        >
+                          <span className="text-sm font-bold text-on-surface">{preset.keyword}</span>
+                          <button
+                            onClick={() => handleDeletePreset(preset.id)}
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-error hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                            title="삭제"
+                          >
+                            <span className="material-symbols-outlined text-xs">close</span>
+                          </button>
+                        </div>
+                      ))}
+                      {groupPresets.length === 0 && (
+                        <p className="text-sm text-on-surface-variant italic py-4">등록된 키워드가 없습니다.</p>
+                      )}
                     </div>
-                  ))}
-                  {db.presetInterests.length === 0 && (
-                    <p className="text-sm text-on-surface-variant italic py-4">등록된 키워드가 없습니다.</p>
-                  )}
-                </div>
-              </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : (
