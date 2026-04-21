@@ -393,13 +393,26 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
           <p className="text-xs text-on-surface-variant italic p-4 bg-surface rounded-xl border border-outline">키워드 데이터가 없습니다.</p>
         ) : (
           <div className="space-y-3">
-            {hotKeywords.map((kw, idx) => {
+            {(() => {
+              const rankIcons: Record<number, string> = {
+                1: '🥇', 2: '🥈', 3: '🥉',
+                4: '4️⃣', 5: '5️⃣', 6: '6️⃣', 7: '7️⃣',
+                8: '8️⃣', 9: '9️⃣', 10: '🔟',
+              };
+              // 동점 동순위 계산
+              const ranks: number[] = [];
+              let rank = 1;
+              for (let i = 0; i < hotKeywords.length; i++) {
+                if (i > 0 && hotKeywords[i].total < hotKeywords[i - 1].total) rank = i + 1;
+                ranks.push(rank);
+              }
+              return hotKeywords.map((kw, idx) => {
               const giverCount = kw.givers.length;
               const takerCount = kw.takers.length;
               const total = kw.total;
               const giverPct = total > 0 ? Math.round((giverCount / total) * 100) : 0;
               const takerPct = 100 - giverPct;
-              const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+              const medal = rankIcons[ranks[idx]] ?? `${ranks[idx]}위`;
 
               return (
                 <button
@@ -408,7 +421,7 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                   className="w-full bg-surface border border-outline rounded-2xl p-4 hover:border-primary/40 hover:shadow-md transition-all text-left group"
                 >
                   <div className="flex items-center gap-3 mb-3">
-                    <span className="text-xl shrink-0">{medals[idx]}</span>
+                    <span className="text-xl shrink-0">{medal}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <h3 className="font-bold text-on-surface text-sm group-hover:text-primary transition-colors">#{kw.displayName}</h3>
@@ -430,7 +443,8 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                   </div>
                 </button>
               );
-            })}
+            });
+            })()}
           </div>
         )}
       </section>

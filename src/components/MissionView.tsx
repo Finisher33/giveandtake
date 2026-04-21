@@ -1,10 +1,78 @@
 ﻿import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useStore, User, TeaTimeRequest } from '../store';
+import { useStore, User, Interest, TeaTimeRequest } from '../store';
 import { TeaReplyModal } from './TeaTimeModal';
 
 const isUrl = (s?: string) =>
   !!s && (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('/'));
+
+function ProfileModal({ user, allInterests, onClose }: { user: User; allInterests: Interest[]; onClose: () => void }) {
+  const interests = allInterests.filter(i => i.userId === user.id);
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white p-6 rounded-xl border-t-8 border-primary max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-hide"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-start mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-xl bg-surface-container-low overflow-hidden flex items-center justify-center border border-outline shrink-0">
+              {isUrl(user.profilePic)
+                ? <img src={user.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                : <span className="material-symbols-outlined text-5xl text-primary/40">face</span>}
+            </div>
+            <div>
+              <p className="text-[11px] text-on-surface-variant uppercase font-bold tracking-widest">
+                {user.company}{user.department ? ` · ${user.department}` : ''}
+              </p>
+              <h3 className="font-headline font-black text-xl text-on-surface uppercase tracking-tight">{user.name}</h3>
+              {user.title && <p className="text-sm text-secondary font-bold uppercase tracking-widest">{user.title}</p>}
+              {user.location && (
+                <p className="text-[11px] text-on-surface-variant/70 flex items-center gap-0.5 mt-0.5">
+                  <span className="material-symbols-outlined text-sm">location_on</span>{user.location}
+                </p>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container-highest transition-colors shrink-0">
+            <span className="material-symbols-outlined text-on-surface-variant">close</span>
+          </button>
+        </div>
+        <div className="space-y-4">
+          {(['giver', 'taker'] as const).map(type => {
+            const items = interests.filter(i => i.type === type);
+            if (items.length === 0) return null;
+            return (
+              <div key={type} className="space-y-2">
+                <h4 className={`flex items-center gap-1.5 ${type === 'giver' ? 'text-primary' : 'text-secondary'}`}>
+                  <span className="material-symbols-outlined text-base shrink-0">{type === 'giver' ? 'volunteer_activism' : 'pan_tool'}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-widest">{type === 'giver' ? 'Giver' : 'Taker'}</span>
+                  <span className="text-[10px] font-normal normal-case tracking-normal text-on-surface-variant truncate">
+                    · {type === 'giver' ? '도움을 드릴 수 있어요.' : '도움을 받고 싶어요.'}
+                  </span>
+                </h4>
+                {items.map(i => (
+                  <div key={i.id} className="bg-surface-container-low p-3 rounded-xl border border-outline">
+                    <p className={`text-sm font-bold mb-1 ${type === 'giver' ? 'text-primary' : 'text-secondary'}`}>#{i.keyword}</p>
+                    <p className="text-[11px] text-on-surface-variant">{i.description}</p>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          {interests.length === 0 && (
+            <p className="text-xs text-on-surface-variant/50 italic">등록된 관심사가 없습니다.</p>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function MissionView({
   onNavigateToLibrary,
@@ -16,6 +84,7 @@ export default function MissionView({
   const { db, currentUser, fetchData, updateTeaTimeRequest } = useStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [replyingToReq, setReplyingToReq] = useState<TeaTimeRequest | null>(null);
+  const [profileUser, setProfileUser] = useState<User | null>(null);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -126,11 +195,14 @@ export default function MissionView({
                 className="bg-surface rounded-xl border border-outline/40 p-4 space-y-3"
               >
                 <div className="flex gap-3 items-start">
-                  <div className="w-10 h-10 rounded-lg bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0 border border-outline">
+                  <button
+                    onClick={() => setProfileUser(toUser)}
+                    className="w-10 h-10 rounded-lg bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0 border border-outline hover:border-primary/50 hover:scale-105 transition-all"
+                  >
                     {isUrl(toUser.profilePic)
                       ? <img src={toUser.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       : <span className="font-bold text-secondary text-[11px]">{toUser.name.charAt(0)}</span>}
-                  </div>
+                  </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -192,11 +264,14 @@ export default function MissionView({
                 className="bg-surface rounded-xl border border-outline/40 p-4 space-y-3"
               >
                 <div className="flex gap-3 items-start">
-                  <div className="w-10 h-10 rounded-lg bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0 border border-outline">
+                  <button
+                    onClick={() => setProfileUser(fromUser)}
+                    className="w-10 h-10 rounded-lg bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0 border border-outline hover:border-primary/50 hover:scale-105 transition-all"
+                  >
                     {isUrl(fromUser.profilePic)
                       ? <img src={fromUser.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       : <span className="font-bold text-secondary text-[11px]">{fromUser.name.charAt(0)}</span>}
-                  </div>
+                  </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -236,6 +311,17 @@ export default function MissionView({
           })
         )}
       </div>
+
+      {/* 프로필 팝업 */}
+      <AnimatePresence>
+        {profileUser && (
+          <ProfileModal
+            user={profileUser}
+            allInterests={db.interests}
+            onClose={() => setProfileUser(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* 응답 모달 */}
       <AnimatePresence>
