@@ -22,6 +22,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
 
   const [keyword, setKeyword] = useState('');
   const [description, setDescription] = useState('');
+  const [insightInputError, setInsightInputError] = useState(false);
   const [selectedKeywordDetail, setSelectedKeywordDetail] = useState<string | null>(null);
   const [revealedBubbles, setRevealedBubbles] = useState<Record<string, Set<string>>>({});
 
@@ -49,9 +50,10 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
   // Prevent duplicate: reuse existing insight ID if one exists for this session
   const handleSaveInsight = (sessionId: string) => {
     if (!keyword.trim() || !description.trim()) {
-      alert('인사이트 키워드와 키워드 작성 이유를 모두 입력해주세요.');
+      setInsightInputError(true);
       return;
     }
+    setInsightInputError(false);
 
     const existing = userInsights.find(i => i.sessionId === sessionId);
     const insight: UserInsight = {
@@ -418,6 +420,12 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                     <h2 className="text-xl md:text-2xl font-headline font-black text-on-surface break-keep leading-tight">
                       {session?.name}
                     </h2>
+                    {session?.time && (
+                      <p className="text-[11px] text-on-surface-variant/50 mt-1 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[11px]">schedule</span>
+                        {session.time}
+                      </p>
+                    )}
                     <p className="text-xs text-on-surface-variant/60 mt-1.5">이 세션에서 얻은 핵심 인사이트를 기록해주세요.</p>
                   </div>
                 );
@@ -463,6 +471,12 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                         <p className="text-xs font-bold text-secondary">이미 등록된 인사이트를 수정합니다.</p>
                       </div>
                     )}
+                    {insightInputError && (
+                      <p className="text-[11px] text-error font-medium flex items-center gap-1 bg-error/5 border border-error/20 rounded-xl px-3 py-2">
+                        <span className="material-symbols-outlined text-sm">warning</span>
+                        인사이트 키워드와 키워드 작성 이유를 모두 입력해주세요.
+                      </p>
+                    )}
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">key</span> 인사이트 키워드 (1개)
@@ -470,9 +484,9 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                       <input
                         type="text"
                         value={keyword}
-                        onChange={e => setKeyword(e.target.value)}
-                        placeholder="기억에 남는 한단어를 기재해주세요. e.g.) 피지컬AI"
-                        className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all"
+                        onChange={e => { setKeyword(e.target.value); if (e.target.value.trim()) setInsightInputError(false); }}
+                        placeholder="기억에 남는 한단어를 기재해주세요."
+                        className={`w-full bg-surface border rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all ${insightInputError && !keyword.trim() ? 'border-error' : 'border-outline'}`}
                       />
                     </div>
                     <div className="space-y-2">
@@ -481,10 +495,10 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                       </label>
                       <textarea
                         value={description}
-                        onChange={e => setDescription(e.target.value)}
+                        onChange={e => { setDescription(e.target.value); if (e.target.value.trim()) setInsightInputError(false); }}
                         placeholder="위에서 키워드를 입력하신 이유와 소감을 상세히 기재해주세요. 다른 리더분들과 입력된 내용을 공유합니다."
                         rows={5}
-                        className="w-full bg-surface border border-outline rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all resize-none"
+                        className={`w-full bg-surface border rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-secondary transition-all resize-none ${insightInputError && !description.trim() ? 'border-error' : 'border-outline'}`}
                       />
                     </div>
                     <button
