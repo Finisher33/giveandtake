@@ -237,24 +237,6 @@ export default function MissionView({
         )}
       </div>
 
-      {/* 탐색 버튼 */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={onNavigateToNetwork}
-          className="py-3 bg-primary/10 text-primary font-bold rounded-xl hover:bg-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-xs border border-primary/20"
-        >
-          <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>diversity_2</span>
-          MY NETWORK
-        </button>
-        <button
-          onClick={onNavigateToLibrary}
-          className="py-3 bg-secondary text-on-secondary font-bold rounded-xl hover:bg-secondary/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-xs"
-        >
-          <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>auto_stories</span>
-          LIBRARY
-        </button>
-      </div>
-
       {/* 응답 모달 */}
       <AnimatePresence>
         {replyingToReq && (() => {
