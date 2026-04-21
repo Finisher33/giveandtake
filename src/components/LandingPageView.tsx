@@ -1,4 +1,4 @@
-import { useStore } from '../store';
+﻿import { useStore } from '../store';
 import { motion } from 'motion/react';
 import NotificationBell from './NotificationBell';
 import { useEffect, useRef } from 'react';
@@ -116,9 +116,9 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-md flex items-center justify-center"
               style={{ background: 'rgba(77,166,255,0.35)', border: '1px solid rgba(77,166,255,0.6)' }}>
-              <span className="material-symbols-outlined text-sm" style={{ color: '#7dc8ff' }}>hub</span>
+              <span className="material-symbols-outlined text-base" style={{ color: '#7dc8ff' }}>hub</span>
             </div>
-            <span className="text-[10px] font-black tracking-[0.2em] uppercase text-white/70">GiveAndTake</span>
+            <span className="text-xs font-black tracking-[0.2em] uppercase text-white/70">GiveAndTake</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="[&_button]:text-white/70 [&_button:hover]:text-white [&_button:hover]:bg-white/10">
@@ -130,17 +130,17 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
               title="내 프로필">
               {currentUser?.profilePic ? (
                 currentUser.profilePic.length < 5
-                  ? <span className="text-sm">{currentUser.profilePic}</span>
+                  ? <span className="text-base">{currentUser.profilePic}</span>
                   : <img src={currentUser.profilePic} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                <span className="material-symbols-outlined text-xl text-white/50">face</span>
+                <span className="material-symbols-outlined text-2xl text-white/50">face</span>
               )}
             </button>
             <div className="w-px h-3 mx-1" style={{ background: 'rgba(255,255,255,0.2)' }} />
             <button onClick={onLogout}
               className="w-8 h-8 rounded-full flex items-center justify-center transition-colors text-white/55 hover:text-red-300 hover:bg-red-500/10"
               title="로그아웃">
-              <span className="material-symbols-outlined text-lg">logout</span>
+              <span className="material-symbols-outlined text-xl">logout</span>
             </button>
           </div>
         </div>
@@ -159,14 +159,14 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
             <div className="flex justify-center mb-4">
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg, rgba(77,166,255,0.3), rgba(0,160,220,0.2))', border: '1px solid rgba(77,166,255,0.5)', boxShadow: '0 0 40px rgba(77,166,255,0.25), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
-                <span className="material-symbols-outlined text-3xl sm:text-4xl" style={{ color: '#7dc8ff' }}>hub</span>
+                <span className="material-symbols-outlined text-4xl sm:text-5xl" style={{ color: '#7dc8ff' }}>hub</span>
               </div>
             </div>
             <h1 className="font-headline font-black tracking-tighter leading-none text-white break-keep"
               style={{ fontSize: 'clamp(1.9rem,8vw,4rem)', textShadow: '0 2px 30px rgba(77,166,255,0.4)' }}>
               be Giver <span style={{ color: '#7dc8ff' }}>be Taker</span>
             </h1>
-            <div className="inline-block px-3 py-1 rounded-full text-xs font-bold"
+            <div className="inline-block px-3 py-1 rounded-full text-sm font-bold"
               style={{ background: 'rgba(77,166,255,0.2)', border: '1px solid rgba(77,166,255,0.4)', color: '#a8d8ff' }}>
               Welcome, {currentUser?.name} 리더님
             </div>
@@ -189,13 +189,13 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
                 style={{ background: 'linear-gradient(90deg, rgba(77,166,255,0.18), transparent)' }} />
               <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 relative z-10"
                 style={{ background: 'linear-gradient(135deg, rgba(77,166,255,0.45), rgba(0,140,220,0.3))', border: '1px solid rgba(77,166,255,0.5)', boxShadow: '0 0 18px rgba(77,166,255,0.25)' }}>
-                <span className="material-symbols-outlined text-xl" style={{ color: '#a8d8ff' }}>hub</span>
+                <span className="material-symbols-outlined text-2xl" style={{ color: '#a8d8ff' }}>hub</span>
               </div>
               <div className="flex-1 min-w-0 relative z-10">
-                <p className="text-sm font-black uppercase tracking-tight text-white leading-none mb-0.5">키워드 네트워크</p>
-                <p className="text-[10px] text-white/55 font-medium">관심사로 연결되는 HMG 리더 네트워크</p>
+                <p className="text-base font-black uppercase tracking-tight text-white leading-none mb-0.5">키워드 네트워크</p>
+                <p className="text-xs text-white/55 font-medium">관심사로 연결되는 HMG 리더 네트워크</p>
               </div>
-              <span className="material-symbols-outlined text-base text-white/35 group-hover:text-[#7dc8ff] group-hover:translate-x-0.5 transition-all relative z-10">arrow_forward_ios</span>
+              <span className="material-symbols-outlined text-lg text-white/35 group-hover:text-[#7dc8ff] group-hover:translate-x-0.5 transition-all relative z-10">arrow_forward_ios</span>
             </motion.button>
 
             {/* 학습 인사이트 */}
@@ -212,13 +212,13 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
                 style={{ background: 'linear-gradient(90deg, rgba(220,180,80,0.18), transparent)' }} />
               <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 relative z-10"
                 style={{ background: 'linear-gradient(135deg, rgba(220,175,70,0.45), rgba(190,130,40,0.3))', border: '1px solid rgba(220,175,70,0.5)', boxShadow: '0 0 18px rgba(220,175,70,0.2)' }}>
-                <span className="material-symbols-outlined text-xl" style={{ color: '#f0d080' }}>psychology</span>
+                <span className="material-symbols-outlined text-2xl" style={{ color: '#f0d080' }}>psychology</span>
               </div>
               <div className="flex-1 min-w-0 relative z-10">
-                <p className="text-sm font-black uppercase tracking-tight text-white leading-none mb-0.5">학습 인사이트 키워드</p>
-                <p className="text-[10px] text-white/55 font-medium">리더들의 학습 인사이트 기록 및 공유</p>
+                <p className="text-base font-black uppercase tracking-tight text-white leading-none mb-0.5">학습 인사이트 키워드</p>
+                <p className="text-xs text-white/55 font-medium">리더들의 학습 인사이트 기록 및 공유</p>
               </div>
-              <span className="material-symbols-outlined text-base text-white/35 group-hover:text-[#f0d080] group-hover:translate-x-0.5 transition-all relative z-10">arrow_forward_ios</span>
+              <span className="material-symbols-outlined text-lg text-white/35 group-hover:text-[#f0d080] group-hover:translate-x-0.5 transition-all relative z-10">arrow_forward_ios</span>
             </motion.button>
           </div>
 
@@ -226,7 +226,7 @@ export default function LandingPageView({ onSelect, onLogout, onProfileClick, on
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}
             className="mt-8 sm:mt-10 flex items-center gap-3">
             <div className="w-6 h-px" style={{ background: 'rgba(255,255,255,0.18)' }} />
-            <span className="text-[8px] font-black tracking-[0.2em] uppercase text-white/30">Hyundai Motor Group</span>
+            <span className="text-[10px] font-black tracking-[0.2em] uppercase text-white/30">Hyundai Motor Group</span>
             <div className="w-6 h-px" style={{ background: 'rgba(255,255,255,0.18)' }} />
           </motion.div>
         </div>

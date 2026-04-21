@@ -1,4 +1,4 @@
-import { useState, useMemo, Key, useRef, type CSSProperties } from 'react';
+﻿import { useState, useMemo, Key, useRef, type CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStore, User, Interest, TeaTimeRequest } from '../store';
 import { TeaReplyModal } from './TeaTimeModal';
@@ -94,16 +94,16 @@ function PartnerProfileModal({
                   : <span className="material-symbols-outlined text-6xl text-primary/40">face</span>}
               </div>
               <div>
-                <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">
+                <p className="text-xs text-on-surface-variant uppercase font-bold tracking-widest">
                   {partner.company}{partner.department ? ` · ${partner.department}` : ''}
                 </p>
-                <h3 className="font-headline font-black text-xl text-on-surface uppercase tracking-tight">{partner.name}</h3>
+                <h3 className="font-headline font-black text-2xl text-on-surface uppercase tracking-tight">{partner.name}</h3>
                 {partner.title && (
-                  <p className="text-sm text-secondary font-black uppercase tracking-widest">{partner.title}</p>
+                  <p className="text-base text-secondary font-black uppercase tracking-widest">{partner.title}</p>
                 )}
                 {partner.location && (
-                  <p className="text-[10px] text-on-surface-variant/70 flex items-center gap-0.5 mt-0.5">
-                    <span className="material-symbols-outlined text-[11px]">location_on</span>{partner.location}
+                  <p className="text-xs text-on-surface-variant/70 flex items-center gap-0.5 mt-0.5">
+                    <span className="material-symbols-outlined text-sm">location_on</span>{partner.location}
                   </p>
                 )}
               </div>
@@ -119,8 +119,8 @@ function PartnerProfileModal({
           {/* 공유 키워드 수 */}
           {sharedCount > 0 && (
             <div className="mb-4 px-3 py-2 bg-primary/5 border border-primary/20 rounded-xl">
-              <p className="text-xs font-bold text-primary">
-                나와 공유 키워드 <span className="text-lg">{sharedCount}</span>개
+              <p className="text-sm font-bold text-primary">
+                나와 공유 키워드 <span className="text-xl">{sharedCount}</span>개
               </p>
             </div>
           )}
@@ -133,29 +133,29 @@ function PartnerProfileModal({
               return (
                 <div key={type} className="space-y-2">
                   <h4 className={`flex items-center gap-1.5 ${type === 'giver' ? 'text-primary' : 'text-secondary'}`}>
-                    <span className="material-symbols-outlined text-sm shrink-0">
+                    <span className="material-symbols-outlined text-base shrink-0">
                       {type === 'giver' ? 'volunteer_activism' : 'pan_tool'}
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest shrink-0">
+                    <span className="text-xs font-bold uppercase tracking-widest shrink-0">
                       {type === 'giver' ? 'Giver' : 'Taker'}
                     </span>
-                    <span className="text-[9px] font-normal normal-case tracking-normal text-on-surface-variant truncate">
+                    <span className="text-[11px] font-normal normal-case tracking-normal text-on-surface-variant truncate">
                       · {type === 'giver' ? '도움을 드릴 수 있어요.' : '도움을 받고 싶어요.'}
                     </span>
                   </h4>
                   {items.map(i => (
                     <div key={i.id} className="bg-surface-container-low p-3 rounded-xl border border-outline">
-                      <p className={`text-sm font-bold mb-1 ${type === 'giver' ? 'text-primary' : 'text-secondary'}`}>
+                      <p className={`text-base font-bold mb-1 ${type === 'giver' ? 'text-primary' : 'text-secondary'}`}>
                         #{i.keyword}
                       </p>
-                      <p className="text-xs text-on-surface-variant">{i.description}</p>
+                      <p className="text-sm text-on-surface-variant">{i.description}</p>
                     </div>
                   ))}
                 </div>
               );
             })}
             {partnerInterests.length === 0 && (
-              <p className="text-xs text-on-surface-variant/50 italic">등록된 관심사가 없습니다.</p>
+              <p className="text-sm text-on-surface-variant/50 italic">등록된 관심사가 없습니다.</p>
             )}
           </div>
         </motion.div>
@@ -204,7 +204,7 @@ function PartnerCard({
           />
         ) : (
           <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/30 group-hover:border-primary transition-colors">
-            <span className="text-primary font-black text-lg">{partner.name.charAt(0)}</span>
+            <span className="text-primary font-black text-xl">{partner.name.charAt(0)}</span>
           </div>
         )}
         <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
@@ -212,22 +212,22 @@ function PartnerCard({
         </div>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-black text-on-surface">{partner.name}</p>
-        <p className="text-[11px] text-on-surface-variant mt-0.5">
+        <p className="text-base font-black text-on-surface">{partner.name}</p>
+        <p className="text-sm text-on-surface-variant mt-0.5">
           {partner.company}{partner.department ? ` · ${partner.department}` : ''}
         </p>
         {partner.title && (
-          <p className="text-[11px] text-on-surface-variant/70">{partner.title}</p>
+          <p className="text-sm text-on-surface-variant/70">{partner.title}</p>
         )}
         {partner.location && (
-          <p className="text-[11px] text-on-surface-variant/60 flex items-center gap-0.5 mt-0.5">
-            <span className="material-symbols-outlined text-[12px]">location_on</span>{partner.location}
+          <p className="text-sm text-on-surface-variant/60 flex items-center gap-0.5 mt-0.5">
+            <span className="material-symbols-outlined text-sm">location_on</span>{partner.location}
           </p>
         )}
         {sharedWith.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {sharedWith.map(kw => (
-              <span key={kw} className="bg-primary/10 text-primary text-[10px] font-bold rounded-md px-2 py-0.5">
+              <span key={kw} className="bg-primary/10 text-primary text-xs font-bold rounded-md px-2 py-0.5">
                 #{kw}
               </span>
             ))}
@@ -345,7 +345,7 @@ function GiftBoxButton({
             ].map((pos, i) => (
               <motion.span
                 key={i}
-                className="absolute text-xs"
+                className="absolute text-sm"
                 style={pos as CSSProperties}
                 animate={{ opacity: [0, 1, 0], scale: [0.5, 1.2, 0.5] }}
                 transition={{ duration: 1.2, repeat: Infinity, delay: pos.delay, ease: 'easeInOut' }}
@@ -357,11 +357,11 @@ function GiftBoxButton({
         )}
 
         <div className="relative z-10 text-center space-y-0.5">
-          <p className="font-black text-sm tracking-wide">
+          <p className="font-black text-base tracking-wide">
             {isConfirmed ? '내 파트너 확인하기!' : '매칭 준비 중'}
           </p>
           {isConfirmed && (
-            <p className="text-[10px] opacity-75">탭해서 나의 런치 파트너를 만나보세요 🎉</p>
+            <p className="text-xs opacity-75">탭해서 나의 런치 파트너를 만나보세요 🎉</p>
           )}
         </div>
       </motion.button>
@@ -417,7 +417,7 @@ function PartnerMatchSection({
         />
       )}
       <div className="h-px bg-outline/30 mb-5" />
-      <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">파트너 매칭</p>
+      <p className="text-xs font-black uppercase tracking-widest text-primary mb-3">파트너 매칭</p>
 
       {!revealed && !loading && (
         <div className="space-y-3">
@@ -428,8 +428,8 @@ function PartnerMatchSection({
           />
           {pendingAlert && !isConfirmed && (
             <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              <span className="material-symbols-outlined text-amber-500 text-base shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
-              <p className="text-xs text-amber-700 font-medium leading-relaxed">
+              <span className="material-symbols-outlined text-amber-500 text-lg shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
+              <p className="text-sm text-amber-700 font-medium leading-relaxed">
                 담당자가 파트너 매칭중입니다. 잠시만 기다려주세요.
               </p>
             </div>
@@ -440,13 +440,13 @@ function PartnerMatchSection({
       {loading && (
         <div className="w-full bg-gradient-to-br from-primary to-primary/80 text-white font-bold py-6 rounded-2xl flex flex-col items-center gap-2 shadow-lg shadow-primary/20">
           <motion.div
-            className="text-4xl"
+            className="text-5xl"
             animate={{ rotate: [0, -15, 15, -10, 10, -5, 5, 0], y: [0, -6, 0] }}
             transition={{ duration: 0.7, repeat: Infinity, repeatDelay: 0.1 }}
           >
             🎁
           </motion.div>
-          <div className="flex items-center gap-0.5 text-sm">
+          <div className="flex items-center gap-0.5 text-base">
             <span>파트너 찾는 중</span>
             {[0, 1, 2].map(i => (
               <motion.span key={i} animate={{ opacity: [0, 1, 0] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.3 }}>.</motion.span>
@@ -465,14 +465,14 @@ function PartnerMatchSection({
           >
             {groupNumber != null && groupNumber > 0 && (
               <div className="flex items-center gap-2 bg-primary/6 border border-primary/20 rounded-xl px-4 py-3">
-                <span className="material-symbols-outlined text-primary text-base shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>groups</span>
-                <p className="text-xs font-black text-primary">나의 런치타임 조 : <span className="text-base">{groupNumber}조</span></p>
+                <span className="material-symbols-outlined text-primary text-lg shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>groups</span>
+                <p className="text-sm font-black text-primary">나의 런치타임 조 : <span className="text-lg">{groupNumber}조</span></p>
               </div>
             )}
             <div className="flex items-center gap-2">
-              <span className="text-lg">🎉</span>
-              <p className="text-sm font-black text-on-surface">나의 런치타임 미션 파트너</p>
-              <span className="ml-auto text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">
+              <span className="text-xl">🎉</span>
+              <p className="text-base font-black text-on-surface">나의 런치타임 미션 파트너</p>
+              <span className="ml-auto text-xs font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-md">
                 {partners.length}명
               </span>
             </div>
@@ -490,10 +490,10 @@ function PartnerMatchSection({
             </div>
             {sharedKws.length > 0 && (
               <div className="bg-surface-container-low rounded-xl px-4 py-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">그룹 공통 관심사</p>
+                <p className="text-xs font-black uppercase tracking-widest text-primary mb-2">그룹 공통 관심사</p>
                 <div className="flex flex-wrap gap-1.5">
                   {sharedKws.map(kw => (
-                    <span key={kw} className="bg-primary/10 text-primary text-[10px] font-bold rounded-md px-2 py-0.5">
+                    <span key={kw} className="bg-primary/10 text-primary text-xs font-bold rounded-md px-2 py-0.5">
                       #{kw}
                     </span>
                   ))}
@@ -501,11 +501,11 @@ function PartnerMatchSection({
               </div>
             )}
             <div className="bg-surface-container-low rounded-xl px-4 py-3 space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">추천 대화 주제</p>
+              <p className="text-xs font-black uppercase tracking-widest text-primary mb-1">추천 대화 주제</p>
               {topics.map((topic, i) => (
                 <div key={i} className="flex items-start gap-2">
-                  <span className="text-primary text-sm mt-0.5">💬</span>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">{topic}</p>
+                  <span className="text-primary text-base mt-0.5">💬</span>
+                  <p className="text-sm text-on-surface-variant leading-relaxed">{topic}</p>
                 </div>
               ))}
             </div>
@@ -574,17 +574,17 @@ function TeaTimeMissionSection({
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className={`flex items-center gap-1.5 text-[10px] font-bold text-on-surface-variant border border-outline/60 rounded-lg px-3 py-1.5 hover:bg-surface-container-low transition-all ${isRefreshing ? 'opacity-60' : ''}`}
+          className={`flex items-center gap-1.5 text-xs font-bold text-on-surface-variant border border-outline/60 rounded-lg px-3 py-1.5 hover:bg-surface-container-low transition-all ${isRefreshing ? 'opacity-60' : ''}`}
         >
-          <span className={`material-symbols-outlined text-sm ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
+          <span className={`material-symbols-outlined text-base ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
           {isRefreshing ? '업데이트 중...' : '최신 데이터로 업데이트'}
         </button>
       </div>
 
       {/* 응원 문구 */}
       <div className="bg-secondary/8 border border-secondary/25 rounded-xl px-4 py-3 flex items-start gap-2.5">
-        <span className="material-symbols-outlined text-secondary text-base mt-0.5 shrink-0">favorite</span>
-        <p className="text-xs text-on-surface-variant leading-relaxed">
+        <span className="material-symbols-outlined text-secondary text-lg mt-0.5 shrink-0">favorite</span>
+        <p className="text-sm text-on-surface-variant leading-relaxed">
           리더분들의 소중한 연결을 응원합니다. :)
         </p>
       </div>
@@ -592,15 +592,15 @@ function TeaTimeMissionSection({
       {/* 미션 진행 현황 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">미션 진행 현황</p>
+          <p className="text-xs font-black uppercase tracking-widest text-on-surface-variant">미션 진행 현황</p>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+            <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
               신청 {sentCount}건
             </span>
-            <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-300 px-2 py-0.5 rounded-md">
+            <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-300 px-2 py-0.5 rounded-md">
               수락 {acceptedCount}건
             </span>
-            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${missionComplete ? 'bg-green-500/15 text-green-600' : 'bg-surface-container-high text-on-surface-variant'}`}>
+            <span className={`text-xs font-black px-2 py-0.5 rounded-md ${missionComplete ? 'bg-green-500/15 text-green-600' : 'bg-surface-container-high text-on-surface-variant'}`}>
               {sentCount} / 2
             </span>
           </div>
@@ -627,10 +627,10 @@ function TeaTimeMissionSection({
             style={{ background: 'linear-gradient(135deg, #22c55e, #10b981)' }}
           >
             <div className="px-4 py-3.5 flex items-center gap-3">
-              <span className="material-symbols-outlined text-white text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>emoji_events</span>
+              <span className="material-symbols-outlined text-white text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>emoji_events</span>
               <div className="flex-1">
-                <p className="font-black text-sm text-white uppercase tracking-wide">Mission Complete!</p>
-                <p className="text-[10px] text-white/80 mt-0.5">
+                <p className="font-black text-base text-white uppercase tracking-wide">Mission Complete!</p>
+                <p className="text-xs text-white/80 mt-0.5">
                   {sentCount}명에게 신청 · {acceptedCount}명 수락 — 멋진 연결을 만들고 있어요! 🎉
                 </p>
               </div>
@@ -642,15 +642,15 @@ function TeaTimeMissionSection({
       {/* 미션 진행 중 응원 문구 */}
       {!missionComplete && (
         <div className="flex items-center gap-2.5 bg-secondary/6 border border-secondary/20 rounded-xl px-4 py-3">
-          <span className="material-symbols-outlined text-secondary text-base shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
-          <p className="text-xs text-secondary font-medium leading-relaxed">관심있는 리더에게 티타임을 제안해보세요.</p>
+          <span className="material-symbols-outlined text-secondary text-lg shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+          <p className="text-sm text-secondary font-medium leading-relaxed">관심있는 리더에게 티타임을 제안해보세요.</p>
         </div>
       )}
 
       {/* 내가 보낸 티타임 요청 목록 */}
       {sentRequests.length > 0 && (
         <div className="space-y-3">
-          <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+          <p className="text-xs font-black uppercase tracking-widest text-on-surface-variant">
             내가 제안한 티타임 ({sentCount}명)
           </p>
           {sentRequests.map((req, idx) => {
@@ -675,20 +675,20 @@ function TeaTimeMissionSection({
                   <div className="w-10 h-10 rounded-lg bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0 border border-outline">
                     {isUrl(toUser.profilePic)
                       ? <img src={toUser.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      : <span className="font-bold text-secondary text-xs">{toUser.name.charAt(0)}</span>}
+                      : <span className="font-bold text-secondary text-sm">{toUser.name.charAt(0)}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-on-surface truncate">{toUser.name}</p>
-                        <p className="text-[10px] text-on-surface-variant truncate">
+                        <p className="text-base font-black text-on-surface truncate">{toUser.name}</p>
+                        <p className="text-xs text-on-surface-variant truncate">
                           {toUser.company}{toUser.department ? ` · ${toUser.department}` : ''}
                         </p>
                         {toUser.title && (
-                          <p className="text-[10px] text-on-surface-variant/70 truncate">{toUser.title}</p>
+                          <p className="text-xs text-on-surface-variant/70 truncate">{toUser.title}</p>
                         )}
                       </div>
-                      <span className={`shrink-0 text-[9px] font-black px-2 py-0.5 rounded-full border whitespace-nowrap ${statusLabel.cls}`}>
+                      <span className={`shrink-0 text-[11px] font-black px-2 py-0.5 rounded-full border whitespace-nowrap ${statusLabel.cls}`}>
                         {statusLabel.text}
                       </span>
                     </div>
@@ -697,17 +697,17 @@ function TeaTimeMissionSection({
 
                 {/* 내 요청 메시지 */}
                 <div className="bg-primary/6 border border-primary/20 rounded-xl px-3 py-2.5">
-                  <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-1">내 제안</p>
-                  <p className="text-[10px] text-on-surface-variant leading-relaxed">{displayMsg}</p>
+                  <p className="text-[11px] font-black text-primary uppercase tracking-widest mb-1">내 제안</p>
+                  <p className="text-xs text-on-surface-variant leading-relaxed">{displayMsg}</p>
                 </div>
 
                 {/* 상대방 응답 */}
                 {req.responseMessage && (
                   <div className={`rounded-xl px-3 py-2.5 border ${req.status === 'accepted' ? 'bg-green-50 border-green-200' : 'bg-surface-container border-outline/40'}`}>
-                    <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${req.status === 'accepted' ? 'text-green-700' : 'text-on-surface-variant'}`}>
+                    <p className={`text-[11px] font-black uppercase tracking-widest mb-1 ${req.status === 'accepted' ? 'text-green-700' : 'text-on-surface-variant'}`}>
                       {toUser.name}님의 응답
                     </p>
-                    <p className="text-[10px] text-on-surface-variant leading-relaxed">{req.responseMessage}</p>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">{req.responseMessage}</p>
                   </div>
                 )}
               </motion.div>
@@ -719,7 +719,7 @@ function TeaTimeMissionSection({
       {/* 내가 받은 티타임 요청 목록 */}
       {receivedRequests.length > 0 && (
         <div className="space-y-3">
-          <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+          <p className="text-xs font-black uppercase tracking-widest text-on-surface-variant">
             내가 요청받은 티타임 ({receivedRequests.length}건)
           </p>
           {receivedRequests.map((req, idx) => {
@@ -744,20 +744,20 @@ function TeaTimeMissionSection({
                   <div className="w-10 h-10 rounded-lg bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0 border border-outline">
                     {isUrl(fromUser.profilePic)
                       ? <img src={fromUser.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      : <span className="font-bold text-secondary text-xs">{fromUser.name.charAt(0)}</span>}
+                      : <span className="font-bold text-secondary text-sm">{fromUser.name.charAt(0)}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-on-surface truncate">{fromUser.name}</p>
-                        <p className="text-[10px] text-on-surface-variant truncate">
+                        <p className="text-base font-black text-on-surface truncate">{fromUser.name}</p>
+                        <p className="text-xs text-on-surface-variant truncate">
                           {fromUser.company}{fromUser.department ? ` · ${fromUser.department}` : ''}
                         </p>
                         {fromUser.title && (
-                          <p className="text-[10px] text-on-surface-variant/70 truncate">{fromUser.title}</p>
+                          <p className="text-xs text-on-surface-variant/70 truncate">{fromUser.title}</p>
                         )}
                       </div>
-                      <span className={`shrink-0 text-[9px] font-black px-2 py-0.5 rounded-full border whitespace-nowrap ${statusLabel.cls}`}>
+                      <span className={`shrink-0 text-[11px] font-black px-2 py-0.5 rounded-full border whitespace-nowrap ${statusLabel.cls}`}>
                         {statusLabel.text}
                       </span>
                     </div>
@@ -766,22 +766,22 @@ function TeaTimeMissionSection({
 
                 {/* 상대방 요청 메시지 */}
                 <div className="bg-secondary/6 border border-secondary/20 rounded-xl px-3 py-2.5">
-                  <p className="text-[9px] font-black text-secondary uppercase tracking-widest mb-1">{fromUser.name}님의 제안</p>
-                  <p className="text-[10px] text-on-surface-variant leading-relaxed">{displayMsg}</p>
+                  <p className="text-[11px] font-black text-secondary uppercase tracking-widest mb-1">{fromUser.name}님의 제안</p>
+                  <p className="text-xs text-on-surface-variant leading-relaxed">{displayMsg}</p>
                 </div>
 
                 {/* 내 응답 or 응답 버튼 */}
                 {req.responseMessage ? (
                   <div className={`rounded-xl px-3 py-2.5 border ${req.status === 'accepted' ? 'bg-green-50 border-green-200' : 'bg-surface-container border-outline/40'}`}>
-                    <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${req.status === 'accepted' ? 'text-green-700' : 'text-on-surface-variant'}`}>
+                    <p className={`text-[11px] font-black uppercase tracking-widest mb-1 ${req.status === 'accepted' ? 'text-green-700' : 'text-on-surface-variant'}`}>
                       내 응답
                     </p>
-                    <p className="text-[10px] text-on-surface-variant leading-relaxed">{req.responseMessage}</p>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">{req.responseMessage}</p>
                   </div>
                 ) : req.status === 'pending' ? (
                   <button
                     onClick={() => setReplyingToReq(req)}
-                    className="w-full py-2.5 bg-amber-500 text-white font-bold text-xs rounded-xl hover:bg-amber-600 active:scale-95 transition-all"
+                    className="w-full py-2.5 bg-amber-500 text-white font-bold text-sm rounded-xl hover:bg-amber-600 active:scale-95 transition-all"
                   >
                     응답하기
                   </button>
@@ -795,11 +795,11 @@ function TeaTimeMissionSection({
       {/* 티타임 요청하기 버튼 */}
       <button
         onClick={onNavigateToLibrary}
-        className="w-full py-4 bg-secondary text-on-secondary font-black rounded-2xl shadow-md hover:bg-secondary/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 text-sm"
+        className="w-full py-4 bg-secondary text-on-secondary font-black rounded-2xl shadow-md hover:bg-secondary/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 text-base"
       >
-        <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>auto_stories</span>
+        <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>auto_stories</span>
         티타임 요청하러 가기
-        <span className="material-symbols-outlined text-base opacity-70">arrow_forward</span>
+        <span className="material-symbols-outlined text-lg opacity-70">arrow_forward</span>
       </button>
 
       {/* 받은 티타임 응답 모달 */}
@@ -933,8 +933,8 @@ export default function MissionView({ onNavigateToLibrary, onNavigateToNetwork }
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
       {/* 헤더 */}
       <div className="pb-3 border-b-2 border-primary/30">
-        <h1 className="font-headline text-2xl font-black uppercase tracking-widest text-primary">MISSION</h1>
-        <p className="text-xs text-on-surface-variant mt-0.5 font-medium">과정 중 도전해볼 네트워킹 미션</p>
+        <h1 className="font-headline text-3xl font-black uppercase tracking-widest text-primary">MISSION</h1>
+        <p className="text-sm text-on-surface-variant mt-0.5 font-medium">과정 중 도전해볼 네트워킹 미션</p>
       </div>
 
       {/* 미션 카드 목록 */}
@@ -973,24 +973,24 @@ export default function MissionView({ onNavigateToLibrary, onNavigateToNetwork }
                     isOpen ? 'bg-primary text-on-primary' : 'bg-primary/8 text-primary'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-xl">{mission.icon}</span>
+                  <span className="material-symbols-outlined text-2xl">{mission.icon}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${mission.badgeColor}`}>
+                    <span className={`text-[11px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${mission.badgeColor}`}>
                       {mission.badge}
                     </span>
                     {teatimeComplete && (
-                      <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border bg-green-500/10 text-green-600 border-green-500/30">
+                      <span className="text-[11px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border bg-green-500/10 text-green-600 border-green-500/30">
                         ✓ COMPLETE
                       </span>
                     )}
                   </div>
-                  <p className="text-sm font-black text-on-surface mt-0.5">{mission.title}</p>
-                  <p className="text-[10px] text-on-surface-variant mt-0.5 line-clamp-1">{mission.summary}</p>
+                  <p className="text-base font-black text-on-surface mt-0.5">{mission.title}</p>
+                  <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-1">{mission.summary}</p>
                 </div>
                 <span
-                  className={`material-symbols-outlined text-on-surface-variant text-xl shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+                  className={`material-symbols-outlined text-on-surface-variant text-2xl shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
                 >
                   expand_more
                 </span>
@@ -1001,7 +1001,7 @@ export default function MissionView({ onNavigateToLibrary, onNavigateToNetwork }
                 <div className="px-5 pb-6 space-y-5 border-t border-outline/40 pt-4">
                   {mission.sections.map(sec => (
                     <div key={sec.heading} className="space-y-1.5">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-primary">{sec.heading}</p>
+                      <p className="text-xs font-black uppercase tracking-widest text-primary">{sec.heading}</p>
                       <div className="bg-surface-container-low rounded-xl px-4 py-3 space-y-1.5">
                         {sec.body.split('\n').map((line, i) => {
                           const isBullet = line.startsWith('• ');
@@ -1022,21 +1022,21 @@ export default function MissionView({ onNavigateToLibrary, onNavigateToNetwork }
                           if (isBullet) {
                             return (
                               <div key={i} className="flex items-start gap-2">
-                                <span className="text-primary font-black text-sm leading-relaxed shrink-0">•</span>
-                                <p className="text-xs text-on-surface-variant leading-relaxed">{renderInline(rawText)}</p>
+                                <span className="text-primary font-black text-base leading-relaxed shrink-0">•</span>
+                                <p className="text-sm text-on-surface-variant leading-relaxed">{renderInline(rawText)}</p>
                               </div>
                             );
                           }
                           if (numberedMatch) {
                             return (
                               <div key={i} className="flex items-start gap-2">
-                                <span className="text-primary font-black text-xs leading-relaxed shrink-0 min-w-[1.2rem]">{numberedMatch[1]}</span>
-                                <p className="text-xs text-on-surface-variant leading-relaxed">{renderInline(rawText)}</p>
+                                <span className="text-primary font-black text-sm leading-relaxed shrink-0 min-w-[1.2rem]">{numberedMatch[1]}</span>
+                                <p className="text-sm text-on-surface-variant leading-relaxed">{renderInline(rawText)}</p>
                               </div>
                             );
                           }
                           return (
-                            <p key={i} className="text-xs text-on-surface-variant leading-relaxed">{renderInline(rawText)}</p>
+                            <p key={i} className="text-sm text-on-surface-variant leading-relaxed">{renderInline(rawText)}</p>
                           );
                         })}
                       </div>

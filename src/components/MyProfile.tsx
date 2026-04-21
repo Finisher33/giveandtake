@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore, Interest, User } from '../store';
 import LocationAutocomplete from './LocationAutocomplete';
 import { HYUNDAI_COMPANIES } from '../constants/companies';
@@ -102,6 +102,16 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
   );
 
   const [isSaving, setIsSaving] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, type });
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  };
+
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   // 전체 Giver+Taker 중 이미 사용된 키워드 (중복 방지)
   const allUsedKeywords = useMemo(() => {
@@ -123,7 +133,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
     const validTakers = takers.filter(t => t.keyword.trim() && t.description.trim());
 
     if (validGivers.length < 2 || validTakers.length < 2) {
-      alert('Giver와 Taker 각각 최소 2개 이상의 키워드와 세부 내용을 입력해주세요.');
+      showToast('Giver와 Taker 각각 최소 2개 이상의 키워드와 세부 내용을 입력해주세요.', 'error');
       return;
     }
 
@@ -131,7 +141,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
     const allKeywords = [...validGivers.map(g => g.keyword.trim().toLowerCase()), ...validTakers.map(t => t.keyword.trim().toLowerCase())];
     const uniqueKeywords = new Set(allKeywords);
     if (uniqueKeywords.size !== allKeywords.length) {
-      alert('Giver와 Taker 전체에서 동일한 관심사는 1번만 등록할 수 있습니다. 중복된 키워드를 제거해주세요.');
+      showToast('Giver와 Taker 전체에서 동일한 관심사는 1번만 등록할 수 있습니다. 중복된 키워드를 제거해주세요.', 'error');
       return;
     }
 
@@ -159,11 +169,10 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
         company: company === '직접입력' ? customCompany : company,
         name, department, title, location, profilePic
       }, newInterests);
-      alert('프로필이 업데이트 되었습니다.');
       onSave();
     } catch (error: any) {
       console.error("Failed to save profile:", error);
-      alert(error?.message || '프로필 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      showToast(error?.message || '프로필 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -214,7 +223,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
     return (
       <div key={idx} className="bg-surface-container-low p-5 rounded-3xl border border-outline space-y-4 relative shadow-sm">
         <div className="flex items-center justify-between">
-          <span className={`text-[10px] font-bold text-${accentClass} bg-${accentClass}/10 px-2 py-0.5 rounded-full uppercase tracking-widest`}>
+          <span className={`text-xs font-bold text-${accentClass} bg-${accentClass}/10 px-2 py-0.5 rounded-full uppercase tracking-widest`}>
             {role === 'giver' ? 'Giver' : 'Taker'} Keyword {idx + 1}
           </span>
           <button
@@ -223,13 +232,13 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
             disabled={list.length <= 2}
             title={list.length > 2 ? '삭제' : '최소 2개 항목이 필요합니다'}
           >
-            <span className="material-symbols-outlined text-sm">delete</span>
+            <span className="material-symbols-outlined text-base">delete</span>
           </button>
         </div>
 
         {/* Step 1: 유형 선택 */}
         <div className="space-y-2">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
+          <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
             Step 1 · 키워드 유형 선택
           </label>
           <div className="flex gap-2">
@@ -241,7 +250,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                 key={opt.key}
                 type="button"
                 onClick={() => update({ keywordGroup: opt.key, keyword: '', isCustom: false, customInput: '' })}
-                className={`px-4 py-2 rounded-xl text-[12px] font-bold border transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
                   entry.keywordGroup === opt.key
                     ? `bg-${accentClass} text-on-${accentClass} border-${accentClass} shadow-sm`
                     : `bg-surface text-on-surface-variant border-outline hover:border-${accentClass}/50`
@@ -256,11 +265,11 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
         {/* Step 2: 키워드 선택 (유형 선택 후 노출) */}
         {entry.keywordGroup && (
           <div className="space-y-3">
-            <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
+            <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
               Step 2 · 키워드 선택
             </label>
 
-            {/* 해시태그 나열 */}
+            {/* 해시태그 + 직접입력 버튼 */}
             <div className="flex flex-wrap gap-2">
               {presets.map(p => {
                 const isSelected = !entry.isCustom && entry.keyword === p.keyword;
@@ -271,7 +280,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                     type="button"
                     disabled={isUsed}
                     onClick={() => !isUsed && selectHashtag(p.keyword)}
-                    className={`px-3 py-1.5 rounded-full text-[12px] font-bold border transition-all ${
+                    className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-all ${
                       isSelected
                         ? `bg-${accentClass} text-on-${accentClass} border-${accentClass} shadow-sm`
                         : isUsed
@@ -283,34 +292,42 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                   </button>
                 );
               })}
+              {/* 직접입력 해시태그 버튼 */}
+              <button
+                type="button"
+                onClick={() => update({ isCustom: true, keyword: entry.customInput.trim() || '', customInput: entry.customInput })}
+                className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-all flex items-center gap-1 ${
+                  entry.isCustom
+                    ? `bg-${accentClass} text-on-${accentClass} border-${accentClass} shadow-sm`
+                    : `bg-surface text-on-surface-variant border-dashed border-outline hover:border-${accentClass}/60 hover:text-${accentClass} hover:bg-${accentClass}/5`
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">edit</span>
+                직접입력
+              </button>
             </div>
 
-            {/* 구분선 + 직접 입력 */}
-            <div className="flex items-center gap-2 pt-1">
-              <div className="flex-1 h-px bg-outline/40" />
-              <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">또는 직접 입력</span>
-              <div className="flex-1 h-px bg-outline/40" />
-            </div>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-sm font-bold">#</span>
-              <input
-                type="text"
-                value={entry.customInput}
-                onChange={e => handleCustomInput(e.target.value)}
-                placeholder={`원하는 키워드를 직접 입력하세요`}
-                className={`w-full bg-surface border rounded-xl pl-7 pr-4 py-2.5 text-sm outline-none transition-all text-on-surface ${
-                  entry.isCustom
-                    ? `border-${accentClass} ring-2 ring-${accentClass}/20`
-                    : 'border-outline focus:border-' + accentClass
-                }`}
-              />
-              {entry.isCustom && entry.customInput && (
-                <span className={`absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-${accentClass} text-base`}>check_circle</span>
-              )}
-            </div>
+            {/* 직접입력 선택 시 텍스트 입력창 노출 */}
+            {entry.isCustom && (
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-base font-bold">#</span>
+                <input
+                  type="text"
+                  value={entry.customInput}
+                  onChange={e => handleCustomInput(e.target.value)}
+                  placeholder="원하는 키워드를 직접 입력하세요"
+                  autoFocus
+                  className={`w-full bg-surface border rounded-xl pl-7 pr-4 py-2.5 text-base outline-none transition-all text-on-surface border-${accentClass} ring-2 ring-${accentClass}/20`}
+                />
+                {entry.customInput && (
+                  <span className={`absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-${accentClass} text-lg`}>check_circle</span>
+                )}
+              </div>
+            )}
+
             {duplicateWarning && (
-              <p className="text-[11px] text-error font-medium flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">warning</span>
+              <p className="text-sm text-error font-medium flex items-center gap-1">
+                <span className="material-symbols-outlined text-base">warning</span>
                 이미 등록된 키워드입니다. 중복 키워드는 사용할 수 없습니다.
               </p>
             )}
@@ -320,11 +337,11 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
         {/* Step 3: 상세 내용 (키워드 선택 후 노출) */}
         {entry.keyword.trim() && !duplicateWarning && (
           <div className="space-y-2">
-            <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
+            <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
               Step 3 · 상세 내용 입력
             </label>
-            <div className={`text-[11px] text-${accentClass}/80 font-medium bg-${accentClass}/5 px-3 py-1.5 rounded-lg inline-flex items-center gap-1`}>
-              <span className="material-symbols-outlined text-sm">tag</span>
+            <div className={`text-sm text-${accentClass}/80 font-medium bg-${accentClass}/5 px-3 py-1.5 rounded-lg inline-flex items-center gap-1`}>
+              <span className="material-symbols-outlined text-base">tag</span>
               {entry.keyword}
             </div>
             <textarea
@@ -335,7 +352,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                 : `"${entry.keyword}"에 대해 어떤 배움을 얻고 싶은지 구체적으로 적어주세요.`
               }
               rows={3}
-              className={`w-full bg-surface border border-outline rounded-xl px-4 py-2.5 text-xs outline-none focus:ring-2 focus:ring-${accentClass}/20 focus:border-${accentClass} transition-all resize-none text-on-surface`}
+              className={`w-full bg-surface border border-outline rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-${accentClass}/20 focus:border-${accentClass} transition-all resize-none text-on-surface`}
             />
           </div>
         )}
@@ -345,6 +362,19 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
 
   return (
     <div className="absolute inset-0 flex flex-col bg-background text-on-surface">
+      {/* 인앱브라우저 호환 토스트 (alert() 대체) */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-2xl shadow-xl text-base font-bold max-w-[90vw] transition-all ${
+          toast.type === 'success'
+            ? 'bg-primary text-on-primary'
+            : 'bg-error text-on-error'
+        }`}>
+          <span className="material-symbols-outlined text-lg">
+            {toast.type === 'success' ? 'check_circle' : 'warning'}
+          </span>
+          {toast.message}
+        </div>
+      )}
       <header className="header-safe shrink-0 z-50 bg-surface/80 backdrop-blur-xl border-b border-outline shadow-sm">
         <div className="h-14 flex justify-between items-center px-6">
           <div className="flex items-center gap-3">
@@ -353,7 +383,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                 <span className="material-symbols-outlined text-on-surface-variant">arrow_back</span>
               </button>
             )}
-            <span className="font-headline text-lg font-bold tracking-tight text-primary">내 프로필 설정</span>
+            <span className="font-headline text-xl font-bold tracking-tight text-primary">내 프로필 설정</span>
           </div>
           {onLogout && (
             <div className="bg-surface-container-low border border-outline rounded-xl p-1 flex items-center shadow-sm">
@@ -362,7 +392,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                 className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors"
                 title="로그아웃"
               >
-                <span className="material-symbols-outlined text-xl">logout</span>
+                <span className="material-symbols-outlined text-2xl">logout</span>
               </button>
             </div>
           )}
@@ -387,7 +417,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
               </div>
             </div>
             <div className="space-y-3 w-full">
-              <p className="text-[10px] font-bold text-on-surface-variant uppercase text-center tracking-widest">프로필 아이콘 선택</p>
+              <p className="text-xs font-bold text-on-surface-variant uppercase text-center tracking-widest">프로필 아이콘 선택</p>
               <div className="grid grid-cols-6 gap-2">
                 {ZODIAC_ANIMALS.map(animal => (
                   <button
@@ -405,7 +435,7 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
           {/* 기본 정보 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1 tracking-widest">회사</label>
+              <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">회사</label>
               <div className="bg-surface-container-low rounded-xl border border-outline focus-within:border-primary transition-colors flex items-center relative">
                 <select
                   value={company}
@@ -413,50 +443,50 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                     setCompany(e.target.value);
                     setIsOtherCompany(e.target.value === '직접입력');
                   }}
-                  className="w-full bg-transparent border-none px-4 py-3 text-sm outline-none text-on-surface appearance-none cursor-pointer pr-10"
+                  className="w-full bg-transparent border-none px-4 py-3 text-base outline-none text-on-surface appearance-none cursor-pointer pr-10"
                 >
                   <option value="" disabled>회사를 선택하세요</option>
                   {HYUNDAI_COMPANIES.map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                <span className="material-symbols-outlined text-on-surface-variant text-sm absolute right-3 pointer-events-none">expand_more</span>
+                <span className="material-symbols-outlined text-on-surface-variant text-base absolute right-3 pointer-events-none">expand_more</span>
               </div>
             </div>
             {isOtherCompany && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1 tracking-widest">회사명 직접 입력</label>
+                <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">회사명 직접 입력</label>
                 <div className="bg-surface-container-low rounded-xl px-4 py-3 border border-outline focus-within:border-primary transition-colors">
                   <input
                     type="text"
                     value={customCompany}
                     onChange={e => setCustomCompany(e.target.value)}
                     placeholder="회사명을 입력하세요"
-                    className="w-full bg-transparent border-none p-0 text-sm outline-none text-on-surface"
+                    className="w-full bg-transparent border-none p-0 text-base outline-none text-on-surface"
                   />
                 </div>
               </div>
             )}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1 tracking-widest">성명</label>
+              <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">성명</label>
               <div className="bg-surface-container-low rounded-xl px-4 py-3 border border-outline focus-within:border-primary transition-colors">
-                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-transparent border-none p-0 text-sm outline-none text-on-surface" />
+                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-transparent border-none p-0 text-base outline-none text-on-surface" />
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1 tracking-widest">담당 조직</label>
+              <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">담당 조직</label>
               <div className="bg-surface-container-low rounded-xl px-4 py-3 border border-outline focus-within:border-primary transition-colors">
-                <input type="text" value={department} onChange={e => setDepartment(e.target.value)} className="w-full bg-transparent border-none p-0 text-sm outline-none text-on-surface" />
+                <input type="text" value={department} onChange={e => setDepartment(e.target.value)} className="w-full bg-transparent border-none p-0 text-base outline-none text-on-surface" />
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1 tracking-widest">직책</label>
+              <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">직책</label>
               <div className="bg-surface-container-low rounded-xl px-4 py-3 border border-outline focus-within:border-primary transition-colors">
-                <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-transparent border-none p-0 text-sm outline-none text-on-surface" />
+                <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-transparent border-none p-0 text-base outline-none text-on-surface" />
               </div>
             </div>
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-[10px] font-bold text-on-surface-variant uppercase ml-1 tracking-widest">근무지</label>
+              <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">근무지</label>
               <div className="bg-surface-container-low rounded-xl px-4 py-3 border border-outline focus-within:border-primary transition-colors">
                 <LocationAutocomplete
                   value={location}
@@ -476,11 +506,11 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
               <div className="border-b border-primary/20 pb-2">
                 <h3 className="flex items-center gap-2 min-w-0 overflow-hidden text-primary">
                   <span className="material-symbols-outlined shrink-0">volunteer_activism</span>
-                  <span className="text-base font-headline font-bold shrink-0">Giver</span>
-                  <span className="text-xs font-normal text-on-surface-variant truncate">· 도움을 드릴 수 있어요.</span>
+                  <span className="text-lg font-headline font-bold shrink-0">Giver</span>
+                  <span className="text-sm font-normal text-on-surface-variant truncate">· 도움을 드릴 수 있어요.</span>
                 </h3>
               </div>
-              <p className="text-[11px] text-on-surface-variant/70 leading-relaxed">
+              <p className="text-sm text-on-surface-variant/70 leading-relaxed">
                 자신이 다른 리더들에게 줄 수 있는 가치나 도움을 키워드와 함께 상세히 적어주세요. (최소 2개, 최대 5개)
               </p>
               <div className="grid gap-6">
@@ -489,9 +519,9 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
               {givers.length < 5 && (
                 <button
                   onClick={addGiver}
-                  className="w-full py-3 flex items-center justify-center gap-2 text-sm font-bold text-primary border-2 border-dashed border-primary/40 rounded-2xl hover:bg-primary/5 hover:border-primary/70 transition-all"
+                  className="w-full py-3 flex items-center justify-center gap-2 text-base font-bold text-primary border-2 border-dashed border-primary/40 rounded-2xl hover:bg-primary/5 hover:border-primary/70 transition-all"
                 >
-                  <span className="material-symbols-outlined text-lg">add_circle</span>
+                  <span className="material-symbols-outlined text-xl">add_circle</span>
                   관심사 추가하기 ({givers.length}/5)
                 </button>
               )}
@@ -502,11 +532,11 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
               <div className="border-b border-secondary/20 pb-2">
                 <h3 className="flex items-center gap-2 min-w-0 overflow-hidden text-secondary">
                   <span className="material-symbols-outlined shrink-0">pan_tool</span>
-                  <span className="text-base font-headline font-bold shrink-0">Taker</span>
-                  <span className="text-xs font-normal text-on-surface-variant truncate">· 도움을 받고 싶어요.</span>
+                  <span className="text-lg font-headline font-bold shrink-0">Taker</span>
+                  <span className="text-sm font-normal text-on-surface-variant truncate">· 도움을 받고 싶어요.</span>
                 </h3>
               </div>
-              <p className="text-[11px] text-on-surface-variant/70 leading-relaxed">
+              <p className="text-sm text-on-surface-variant/70 leading-relaxed">
                 다른 리더들로부터 배우고 싶거나 도움을 받고 싶은 분야를 키워드와 함께 적어주세요. (최소 2개, 최대 5개)
               </p>
               <div className="grid gap-6">
@@ -515,9 +545,9 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
               {takers.length < 5 && (
                 <button
                   onClick={addTaker}
-                  className="w-full py-3 flex items-center justify-center gap-2 text-sm font-bold text-secondary border-2 border-dashed border-secondary/40 rounded-2xl hover:bg-secondary/5 hover:border-secondary/70 transition-all"
+                  className="w-full py-3 flex items-center justify-center gap-2 text-base font-bold text-secondary border-2 border-dashed border-secondary/40 rounded-2xl hover:bg-secondary/5 hover:border-secondary/70 transition-all"
                 >
-                  <span className="material-symbols-outlined text-lg">add_circle</span>
+                  <span className="material-symbols-outlined text-xl">add_circle</span>
                   관심사 추가하기 ({takers.length}/5)
                 </button>
               )}

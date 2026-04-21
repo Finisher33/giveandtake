@@ -1,7 +1,9 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore, User, Interest } from '../store';
 import * as d3 from 'd3';
 import { motion, AnimatePresence } from 'motion/react';
+import { useToast } from '../hooks/useToast';
+import Toast from './Toast';
 
 interface BubbleNode extends d3.SimulationNodeDatum {
   id: string;
@@ -25,7 +27,8 @@ interface NetworkLink extends d3.SimulationLinkDatum<NetworkNode> {
 export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }) {
   const { db, currentUser, sendTeaTimeRequest, synonymLevel, fetchData } = useStore();
   const effectiveCourseId = adminCourseId || currentUser?.courseId;
-  
+  const { toast, showToast } = useToast();
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -263,7 +266,7 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
   const handleSendTeaTime = (toUserId: string, message?: string) => {
     const finalMsg = message || teaTimeMsg;
     if (!finalMsg.trim()) {
-      alert('메시지를 입력해주세요.');
+      showToast('메시지를 입력해주세요.', 'error');
       return;
     }
     sendTeaTimeRequest({
@@ -275,7 +278,7 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
     });
     setTeaTimeMsg('');
     setSelectedUser(null);
-    alert('티타임 요청을 보냈습니다.');
+    showToast('티타임 요청을 보냈습니다.', 'success');
   };
 
   const selectedKeywordInterests = useMemo(() => {
@@ -355,10 +358,11 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className={`${isFullScreen ? 'fixed inset-0 z-[9999] w-screen h-screen bg-background' : `relative w-full ${adminCourseId ? 'h-[800px]' : 'h-full'}`} bg-background overflow-hidden select-none touch-none`}
     >
+      <Toast toast={toast} />
       {/* Visualization Area */}
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing">
         <defs>
@@ -463,7 +467,7 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
               <text
                 textAnchor="middle"
                 dy={node.type === 'user' ? 20 : 25}
-                className={`text-[10px] font-sans font-bold pointer-events-none uppercase tracking-tight ${node.type === 'user' && node.data?.id === currentUser?.id ? 'fill-blue-600' : 'fill-on-surface'}`}
+                className={`text-xs font-sans font-bold pointer-events-none uppercase tracking-tight ${node.type === 'user' && node.data?.id === currentUser?.id ? 'fill-blue-600' : 'fill-on-surface'}`}
                 style={{ 
                   paintOrder: 'stroke',
                   stroke: '#ffffff',
@@ -503,7 +507,7 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
       {/* Legend & Controls */}
       <div className="absolute top-4 left-4 flex flex-col gap-3 z-30">
         <div className="bg-white/80 backdrop-blur-md px-4 py-3 rounded-xl border border-outline shadow-sm">
-          <div className="text-[10px] uppercase tracking-widest text-on-surface-variant font-black mb-2">
+          <div className="text-xs uppercase tracking-widest text-on-surface-variant font-black mb-2">
             Network Map
           </div>
           <div className="flex items-center gap-4">
@@ -512,13 +516,13 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
                 <div className="w-6 h-0.5 bg-primary relative">
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-1 border-t border-r border-primary rotate-45"></div>
                 </div>
-                <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Giver</span>
+                <span className="text-xs font-black text-on-surface-variant uppercase tracking-widest">Giver</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-6 h-0.5 bg-secondary relative">
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-1 border-t border-r border-secondary rotate-45"></div>
                 </div>
-                <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Taker</span>
+                <span className="text-xs font-black text-on-surface-variant uppercase tracking-widest">Taker</span>
               </div>
             </>
           </div>
@@ -530,7 +534,7 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-surface-container-highest transition-colors text-on-surface-variant"
             title="Zoom In"
           >
-            <span className="material-symbols-outlined text-lg">add</span>
+            <span className="material-symbols-outlined text-xl">add</span>
           </button>
           <div className="h-px bg-outline/10 mx-1"></div>
           <button 
@@ -538,7 +542,7 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-surface-container-highest transition-colors text-on-surface-variant"
             title="Zoom Out"
           >
-            <span className="material-symbols-outlined text-lg">remove</span>
+            <span className="material-symbols-outlined text-xl">remove</span>
           </button>
           <div className="h-px bg-outline/10 mx-1"></div>
           <button 
@@ -546,9 +550,9 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-surface-container-highest transition-colors text-on-surface-variant"
             title="Reset"
           >
-            <span className="material-symbols-outlined text-lg">restart_alt</span>
+            <span className="material-symbols-outlined text-xl">restart_alt</span>
           </button>
-          <div className="text-[9px] font-bold text-center text-on-surface-variant/60">{Math.round(transform.k * 100)}%</div>
+          <div className="text-[11px] font-bold text-center text-on-surface-variant/60">{Math.round(transform.k * 100)}%</div>
         </div>
       </div>
 
@@ -575,18 +579,18 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <h3 className="font-headline font-black text-2xl text-primary uppercase tracking-tight">#{getKeywordName(selectedKeyword)}</h3>
+                      <h3 className="font-headline font-black text-3xl text-primary uppercase tracking-tight">#{getKeywordName(selectedKeyword)}</h3>
                       {adminCourseId && (
                         <div className="flex gap-2">
-                          <span className="bg-primary text-on-primary text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest">Admin View</span>
+                          <span className="bg-primary text-on-primary text-xs font-black px-2 py-0.5 rounded uppercase tracking-widest">Admin View</span>
                           <div className="flex items-center gap-2 bg-surface-container-highest px-2 py-0.5 rounded border border-outline">
-                            <span className="text-[9px] font-black text-primary">G: {courseInterests.filter(i => (i.canonicalId || i.keyword) === selectedKeyword && i.type === 'giver').length}</span>
-                            <span className="text-[9px] font-black text-secondary">T: {courseInterests.filter(i => (i.canonicalId || i.keyword) === selectedKeyword && i.type === 'taker').length}</span>
+                            <span className="text-[11px] font-black text-primary">G: {courseInterests.filter(i => (i.canonicalId || i.keyword) === selectedKeyword && i.type === 'giver').length}</span>
+                            <span className="text-[11px] font-black text-secondary">T: {courseInterests.filter(i => (i.canonicalId || i.keyword) === selectedKeyword && i.type === 'taker').length}</span>
                           </div>
                         </div>
                       )}
                       <div className="bg-primary/10 border border-primary/20 px-3 py-1 rounded-md">
-                        <p className="text-[10px] font-black text-primary flex items-center gap-1.5 uppercase tracking-widest">
+                        <p className="text-xs font-black text-primary flex items-center gap-1.5 uppercase tracking-widest">
                           <span className="material-symbols-outlined text-[14px]">tips_and_updates</span>
                           {(() => {
                             const interests = courseInterests.filter(i => (i.canonicalId || i.keyword) === selectedKeyword && i.userId !== currentUser?.id);
@@ -604,7 +608,7 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
                     {/* Hashtags of related keywords */}
                     <div className="flex flex-wrap gap-1.5 mt-3">
                       {((keywordGroups[selectedKeyword] || []) as string[]).map(kw => (
-                        <span key={kw} className="text-[10px] bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-md border border-outline font-black uppercase tracking-widest">#{kw}</span>
+                        <span key={kw} className="text-xs bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-md border border-outline font-black uppercase tracking-widest">#{kw}</span>
                       ))}
                     </div>
                   </div>
@@ -617,17 +621,17 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
               {/* Content List */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">참여 리더 리스트</span>
+                  <span className="text-xs font-black text-on-surface-variant uppercase tracking-widest">참여 리더 리스트</span>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => setSortConfig({ key: 'type', direction: sortConfig.key === 'type' && sortConfig.direction === 'asc' ? 'desc' : 'asc' })}
-                      className={`text-[10px] font-black px-2 py-1 rounded-md border transition-colors uppercase tracking-widest ${sortConfig.key === 'type' ? 'bg-primary text-on-primary border-primary' : 'bg-white border-outline text-on-surface-variant'}`}
+                      className={`text-xs font-black px-2 py-1 rounded-md border transition-colors uppercase tracking-widest ${sortConfig.key === 'type' ? 'bg-primary text-on-primary border-primary' : 'bg-white border-outline text-on-surface-variant'}`}
                     >
                       구분 {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </button>
                     <button 
                       onClick={() => setSortConfig({ key: 'name', direction: sortConfig.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc' })}
-                      className={`text-[10px] font-black px-2 py-1 rounded-md border transition-colors uppercase tracking-widest ${sortConfig.key === 'name' ? 'bg-primary text-on-primary border-primary' : 'bg-white border-outline text-on-surface-variant'}`}
+                      className={`text-xs font-black px-2 py-1 rounded-md border transition-colors uppercase tracking-widest ${sortConfig.key === 'name' ? 'bg-primary text-on-primary border-primary' : 'bg-white border-outline text-on-surface-variant'}`}
                     >
                       이름 {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </button>
@@ -650,26 +654,26 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
                             {u.profilePic ? (
                               <img src={u.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
-                              <span className="material-symbols-outlined text-4xl text-primary/40">face</span>
+                              <span className="material-symbols-outlined text-5xl text-primary/40">face</span>
                             )}
                           </div>
                             <div>
-                              <p className="text-[10px] text-on-surface-variant font-medium uppercase tracking-widest">{u.company} • {u.department}</p>
+                              <p className="text-xs text-on-surface-variant font-medium uppercase tracking-widest">{u.company} • {u.department}</p>
                               <div className="flex items-center gap-2">
-                                <p className="text-sm font-black text-on-surface">{u.name}</p>
-                                {isMe && <span className="text-[9px] font-black bg-primary text-on-primary px-1.5 py-0.5 rounded uppercase tracking-widest">나</span>}
+                                <p className="text-base font-black text-on-surface">{u.name}</p>
+                                {isMe && <span className="text-[11px] font-black bg-primary text-on-primary px-1.5 py-0.5 rounded uppercase tracking-widest">나</span>}
                               </div>
-                              <p className="text-[10px] text-on-surface-variant font-medium uppercase tracking-widest">{u.title}</p>
-                              {u.location && <p className="text-[10px] text-on-surface-variant/60 flex items-center gap-0.5"><span className="material-symbols-outlined text-[11px]">location_on</span>{u.location}</p>}
+                              <p className="text-xs text-on-surface-variant font-medium uppercase tracking-widest">{u.title}</p>
+                              {u.location && <p className="text-xs text-on-surface-variant/60 flex items-center gap-0.5"><span className="material-symbols-outlined text-sm">location_on</span>{u.location}</p>}
                             </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-md font-black text-[10px] uppercase border ${interest.type === 'giver' ? 'bg-primary text-on-primary border-primary' : 'bg-secondary text-on-secondary border-secondary'}`}>
+                        <span className={`px-3 py-1 rounded-md font-black text-xs uppercase border ${interest.type === 'giver' ? 'bg-primary text-on-primary border-primary' : 'bg-secondary text-on-secondary border-secondary'}`}>
                           {interest.type === 'giver' ? 'Giver' : 'Taker'}
                         </span>
                       </div>
                       <div className={`${isMe ? 'bg-white/60' : 'bg-surface-container-low'} rounded-lg p-3 border border-outline`}>
-                        <p className="text-[10px] font-black text-primary mb-1 uppercase tracking-widest">#{interest.keyword}</p>
-                        <p className="text-xs text-on-surface-variant leading-relaxed font-medium">
+                        <p className="text-xs font-black text-primary mb-1 uppercase tracking-widest">#{interest.keyword}</p>
+                        <p className="text-sm text-on-surface-variant leading-relaxed font-medium">
                           {interest.description}
                         </p>
                       </div>
@@ -709,10 +713,10 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
                     )}
                   </div>
                   <div>
-                    <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">{selectedUser.company} • {selectedUser.department}</p>
-                    <h3 className="font-headline font-black text-2xl text-on-surface uppercase tracking-tight">{selectedUser.name}</h3>
-                    <p className="text-sm text-secondary font-black uppercase tracking-widest">{selectedUser.title}</p>
-                    {selectedUser.location && <p className="text-[11px] text-on-surface-variant/70 flex items-center gap-0.5 mt-0.5"><span className="material-symbols-outlined text-[13px]">location_on</span>{selectedUser.location}</p>}
+                    <p className="text-xs text-on-surface-variant uppercase font-bold tracking-widest">{selectedUser.company} • {selectedUser.department}</p>
+                    <h3 className="font-headline font-black text-3xl text-on-surface uppercase tracking-tight">{selectedUser.name}</h3>
+                    <p className="text-base text-secondary font-black uppercase tracking-widest">{selectedUser.title}</p>
+                    {selectedUser.location && <p className="text-sm text-on-surface-variant/70 flex items-center gap-0.5 mt-0.5"><span className="material-symbols-outlined text-[13px]">location_on</span>{selectedUser.location}</p>}
                   </div>
                 </div>
                 <button onClick={() => setSelectedUser(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-highest transition-colors">
@@ -723,15 +727,15 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
               <div className="space-y-8">
                 <div className="space-y-4">
                   <h4 className="flex items-center gap-1.5 min-w-0 overflow-hidden text-primary">
-                    <span className="material-symbols-outlined text-sm shrink-0">volunteer_activism</span>
-                    <span className="text-[10px] font-black uppercase tracking-widest shrink-0">Giver</span>
-                    <span className="text-[9px] font-normal normal-case tracking-normal text-on-surface-variant truncate">· 도움을 드릴 수 있어요.</span>
+                    <span className="material-symbols-outlined text-base shrink-0">volunteer_activism</span>
+                    <span className="text-xs font-black uppercase tracking-widest shrink-0">Giver</span>
+                    <span className="text-[11px] font-normal normal-case tracking-normal text-on-surface-variant truncate">· 도움을 드릴 수 있어요.</span>
                   </h4>
                   <div className="grid gap-3">
                     {selectedUserInterests.filter(i => i.type === 'giver').map(i => (
                       <div key={i.id} className="bg-white p-4 rounded-lg border border-outline shadow-sm">
-                        <p className="text-[10px] font-black text-primary mb-1 uppercase tracking-widest">#{i.keyword}</p>
-                        <p className="text-xs text-on-surface-variant font-medium leading-relaxed">{i.description}</p>
+                        <p className="text-xs font-black text-primary mb-1 uppercase tracking-widest">#{i.keyword}</p>
+                        <p className="text-sm text-on-surface-variant font-medium leading-relaxed">{i.description}</p>
                       </div>
                     ))}
                   </div>
@@ -739,15 +743,15 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
 
                 <div className="space-y-4">
                   <h4 className="flex items-center gap-1.5 min-w-0 overflow-hidden text-secondary">
-                    <span className="material-symbols-outlined text-sm shrink-0">pan_tool</span>
-                    <span className="text-[10px] font-black uppercase tracking-widest shrink-0">Taker</span>
-                    <span className="text-[9px] font-normal normal-case tracking-normal text-on-surface-variant truncate">· 도움을 받고 싶어요.</span>
+                    <span className="material-symbols-outlined text-base shrink-0">pan_tool</span>
+                    <span className="text-xs font-black uppercase tracking-widest shrink-0">Taker</span>
+                    <span className="text-[11px] font-normal normal-case tracking-normal text-on-surface-variant truncate">· 도움을 받고 싶어요.</span>
                   </h4>
                   <div className="grid gap-3">
                     {selectedUserInterests.filter(i => i.type === 'taker').map(i => (
                       <div key={i.id} className="bg-white p-4 rounded-lg border border-outline shadow-sm">
-                        <p className="text-[10px] font-black text-secondary mb-1 uppercase tracking-widest">#{i.keyword}</p>
-                        <p className="text-xs text-on-surface-variant font-medium leading-relaxed">{i.description}</p>
+                        <p className="text-xs font-black text-secondary mb-1 uppercase tracking-widest">#{i.keyword}</p>
+                        <p className="text-sm text-on-surface-variant font-medium leading-relaxed">{i.description}</p>
                       </div>
                     ))}
                   </div>
@@ -755,20 +759,20 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
                 
                 {selectedUser.id !== currentUser?.id && (
                   <div className="space-y-4 pt-6 border-t border-outline">
-                    <h4 className="text-[10px] font-black text-on-surface uppercase tracking-widest">티타임 요청</h4>
-                    <p className="text-[10px] text-on-surface-variant font-medium mb-2">
+                    <h4 className="text-xs font-black text-on-surface uppercase tracking-widest">티타임 요청</h4>
+                    <p className="text-xs text-on-surface-variant font-medium mb-2">
                       {selectedUser.name}님에게 구체적인 일정과 장소를 기재하여 티타임을 제안해보세요.
                     </p>
                     <textarea 
                       value={teaTimeMsg}
                       onChange={e => setTeaTimeMsg(e.target.value)}
                       placeholder={`${selectedUser.name}님에게 보낼 짧은 메시지를 작성하세요...`}
-                      className="w-full bg-surface-container-low border border-outline rounded-lg p-4 text-sm resize-none outline-none focus:ring-2 focus:ring-primary/20 font-medium"
+                      className="w-full bg-surface-container-low border border-outline rounded-lg p-4 text-base resize-none outline-none focus:ring-2 focus:ring-primary/20 font-medium"
                       rows={4}
                     />
                     <div className="flex flex-wrap gap-2">
                       {db.interests.filter((i: any) => i.userId === currentUser?.id).map((i: any) => (
-                        <span key={i.id} className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-md border border-primary/20">
+                        <span key={i.id} className="px-2 py-1 bg-primary/10 text-primary text-xs font-bold rounded-md border border-primary/20">
                           #{i.keyword}
                         </span>
                       ))}
@@ -810,8 +814,8 @@ export default function NetworkMap({ adminCourseId }: { adminCourseId?: string }
             >
               <div className="p-6 border-b border-outline flex justify-between items-center bg-surface-container-low">
                 <div>
-                  <h3 className="font-headline font-black text-xl text-primary uppercase tracking-tight">Personal Network Map</h3>
-                  <p className="text-xs text-on-surface-variant font-medium">나와 연결된 키워드와 동료들을 한눈에 확인해보세요.</p>
+                  <h3 className="font-headline font-black text-2xl text-primary uppercase tracking-tight">Personal Network Map</h3>
+                  <p className="text-sm text-on-surface-variant font-medium">나와 연결된 키워드와 동료들을 한눈에 확인해보세요.</p>
                 </div>
                 <button onClick={() => setShowPersonalNetwork(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-highest transition-colors">
                   <span className="material-symbols-outlined">close</span>
@@ -1042,7 +1046,7 @@ function PersonalNetworkMap({ currentUser, db, onSelectUser, onSelectKeyword }: 
               <text
                 textAnchor="middle"
                 dy={node.type === 'user' ? 22 : 28}
-                className={`text-[10px] font-bold fill-on-surface pointer-events-none uppercase tracking-tight ${node.type === 'user' && node.data?.id === currentUser.id ? 'fill-blue-600' : ''}`}
+                className={`text-xs font-bold fill-on-surface pointer-events-none uppercase tracking-tight ${node.type === 'user' && node.data?.id === currentUser.id ? 'fill-blue-600' : ''}`}
                 style={{ paintOrder: 'stroke', stroke: '#ffffff', strokeWidth: '3px' }}
               >
                 {node.label}

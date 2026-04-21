@@ -1,4 +1,6 @@
-import { useMemo, useState, useRef } from 'react';
+﻿import { useMemo, useState, useRef } from 'react';
+import { useToast } from '../hooks/useToast';
+import Toast from './Toast';
 import { useStore, User, Interest } from '../store';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -16,32 +18,62 @@ interface MyNetworkProps {
 function SectionTitle({ icon, title, badge }: { icon: string; title: string; badge?: string }) {
   return (
     <div className="flex items-center gap-2 pb-2 border-b border-outline/40">
-      <span className="material-symbols-outlined text-primary text-xl">{icon}</span>
-      <h2 className="font-headline text-base font-black uppercase tracking-widest text-on-surface">{title}</h2>
+      <span className="material-symbols-outlined text-primary text-2xl">{icon}</span>
+      <h2 className="font-headline text-lg font-black uppercase tracking-widest text-on-surface">{title}</h2>
       {badge && (
-        <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold border border-primary/20 ml-1">{badge}</span>
+        <span className="text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold border border-primary/20 ml-1">{badge}</span>
       )}
     </div>
   );
 }
 
-// ─── SNA 지표 산출 방식 설명 ─────────────────────────────────────────────────
-const SNA_METRIC_EXPLANATIONS: Record<string, string> = {
-  '마당발': '① 내가 등록한 관심사 키워드 수를 셉니다. ② 각 키워드마다 같은 키워드를 가진 다른 리더 수를 모두 더합니다. ③ 두 값을 합산한 뒤, 과정 전체 고유 키워드 수 × 전체 리더 수로 나눠 100점 만점으로 환산합니다. 키워드가 다양하고, 각 키워드에 연결된 리더가 많을수록 점수가 높아집니다.',
-  '게이트키퍼': '① 나를 제외한 두 리더(A, B) 사이의 최단 연결 경로를 모두 탐색합니다. ② 그 경로가 나를 경유하는 경우를 셉니다(A→나→B가 최단 경로이면 +1). ③ 내가 경유하는 경로 수를 전체 리더 쌍의 수로 나눠 100점 만점으로 환산합니다. 내가 없으면 서로 연결되기 어려운 리더 사이를 많이 잇고 있을수록 점수가 높아집니다.',
-  '전파자': '① 나에서 다른 모든 리더까지 도달하는 데 필요한 연결 단계 수를 계산합니다(1단계 = 공통 키워드로 직접 연결, 2단계 = 한 명을 거쳐 연결). ② 도달 가능한 리더 수²를 (전체 리더-1) × 총 거리 합으로 나눠 100점 만점으로 환산합니다. 도달할 수 있는 리더가 많고, 평균 거리가 짧을수록 점수가 높아집니다.',
+// ─── 비지배 유형 간략 설명 (2줄 이내) ────────────────────────────────────────
+const SNA_SHORT_DESCRIPTIONS: Record<string, string> = {
+  '마당발(인플루언서)': '연결 중심성이 높은 유형으로, 과정 내에서 가장 많은 리더와 직접 연결되어 있습니다. 다양한 키워드를 통해 폭넓은 관계망을 보유하며 정보를 빠르게 확산시키는 허브 역할을 합니다.',
+  '게이트키퍼': '매개 중심성이 높은 유형으로, 서로 다른 그룹 사이를 잇는 핵심 연결자입니다. 나를 경유해야만 전달되는 정보 흐름이 많아 네트워크에서 대체 불가능한 다리 역할을 합니다.',
+  '안테나': '근접 중심성이 높은 유형으로, 네트워크 내 모든 리더에게 가장 짧은 경로로 도달할 수 있습니다. 특정 경로에 의존하지 않고 독립적으로 정보를 전파할 수 있는 최적의 위치에 있습니다.',
+};
+
+// ─── SNA 유형별 풍부한 설명 ───────────────────────────────────────────────────
+const SNA_RICH_DESCRIPTIONS: Record<string, { subtitle: string; sections: { label: string; content: string }[] }> = {
+  '마당발(인플루언서)': {
+    subtitle: '연결 중심성 — "네트워크의 핵인싸" (Social Magnet)',
+    sections: [
+      { label: '고유 속성', content: '연결 중심성만의 고유한 속성은 가시적인 활동성입니다.' },
+      { label: '차별화 포인트', content: '네트워크의 구조나 위치를 따지기 전에, 당장 내 주변에 얼마나 많은 사람이 실시간으로 연결되어 있는가입니다.' },
+      { label: '결정적 속성', content: '[확산력] — 내가 한마디만 해도 즉각적으로 반응할 직속 부대가 가장 많다는 뜻으로, 단기적인 정보 전파나 동원 능력이 가장 강력합니다.' },
+      { label: '비유', content: '수많은 팔로워를 거느린 대형 유튜버나 대학 축제 때 가장 많은 사람을 불러 모으는 인기 과대표와 같습니다. 복잡한 전략 없이도 오직 숫자의 힘만으로 네트워크 내에서 가장 큰 목소리를 낼 수 있습니다.' },
+    ],
+  },
+  '안테나': {
+    subtitle: '근접 중심성 — "독립적인 전파자"',
+    sections: [
+      { label: '고유 속성', content: '근접 중심성만의 고유한 속성은 독립적인 전파 속도입니다.' },
+      { label: '차별화 포인트', content: '남에게 의존하지 않고 모든 노드에 얼마나 직격으로 닿을 수 있는가입니다.' },
+      { label: '결정적 속성', content: '[효율성] — 매개 중심성이 남들의 대화를 가로막는 힘이라면, 근접 중심성은 내가 직접 남들에게 도달하는 능력입니다.' },
+      { label: '비유', content: '119 소방서나 쿠팡 물류센터와 같습니다. 특정 길목을 막고 서 있는 건 아니지만, 사고가 나거나 배송을 할 때 도시 어느 지점이든 가장 짧은 시간 안에 도착할 수 있는 최적의 입지에 있는 것입니다.' },
+    ],
+  },
+  '게이트키퍼': {
+    subtitle: '매개 중심성 — "대체 불가능한 연결자"',
+    sections: [
+      { label: '고유 속성', content: '매개 중심성만의 고유한 속성은 대체 불가능성입니다.' },
+      { label: '차별화 포인트', content: '단순히 중심에 있는 것이 아니라, 서로 다른 두 세계(클러스터)를 잇는 외줄기 다리 위에 서 있는가입니다.' },
+      { label: '결정적 속성', content: '[통제권] — 이 노드가 사라지면 네트워크는 물리적으로 절단되거나, 정보 전달 경로가 엄청나게 길어집니다.' },
+      { label: '비유', content: '서울과 부산을 잇는 유일한 고속도로의 휴게소와 같습니다. 모두가 그곳을 거쳐야만 하기에, 휴게소 주인은 정보와 흐름을 마음대로 주무를 수 있습니다.' },
+    ],
+  },
 };
 
 export default function MyNetwork({ targetUser, hideActions = false }: MyNetworkProps) {
-  const { db, currentUser: storeUser, updateTeaTimeRequest, sendTeaTimeRequest, fetchData } = useStore();
+  const { db, currentUser: storeUser, fetchData, updateTeaTimeRequest, sendTeaTimeRequest } = useStore();
   const currentUser = targetUser || storeUser;
+  const { toast, showToast } = useToast();
 
   // ── state ──────────────────────────────────────────────────────────────────
+  const [selectedKeyword, setSelectedKeyword] = useState<HotKeyword | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [replyingToReq, setReplyingToReq] = useState<TeaTimeRequest | null>(null);
-  const [replyMsg, setReplyMsg] = useState('');
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [selectedKeyword, setSelectedKeyword] = useState<HotKeyword | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -63,52 +95,28 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
     return calculateHotKeywords(currentUser, db, 5);
   }, [currentUser, db]);
 
-  const { groupedNetwork, summary, keywordGroups, myInterests, recommendedLeaders } = networkData || {
+  const selectedUserInterests = useMemo(() => {
+    if (!selectedUser) return [];
+    return db.interests.filter((i: Interest) => i.userId === selectedUser.id);
+  }, [selectedUser, db.interests]);
+
+  const { groupedNetwork, summary, myInterests, recommendedLeaders } = networkData || {
     groupedNetwork: [],
     summary: { total: 0, givers: 0, takers: 0, receivedCount: 0, sentCount: 0 },
-    keywordGroups: {},
     myInterests: [],
     recommendedLeaders: [],
   };
 
-  const receivedRequests = useMemo(
-    () => db.teaTimeRequests.filter(r => r.toUserId === currentUser?.id),
-    [db.teaTimeRequests, currentUser]
-  );
-  const sentRequests = useMemo(
-    () => db.teaTimeRequests.filter(r => r.fromUserId === currentUser?.id),
-    [db.teaTimeRequests, currentUser]
-  );
-
-  const selectedUserInterests = useMemo(
-    () => (selectedUser ? db.interests.filter(i => i.userId === selectedUser.id) : []),
-    [db.interests, selectedUser]
-  );
-
   // ── handlers ───────────────────────────────────────────────────────────────
+  const handleSendTeaTime = async (message: string) => {
+    if (!selectedUser || !currentUser) return;
+    await sendTeaTimeRequest(currentUser.id, selectedUser.id, message);
+    setSelectedUser(null);
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try { await fetchData(); } finally { setIsRefreshing(false); }
-  };
-
-  const handleAccept = (reqId: string) => {
-    updateTeaTimeRequest(reqId, 'accepted', replyMsg);
-    setReplyingTo(null); setReplyMsg('');
-  };
-  const handleReject = (reqId: string) => {
-    updateTeaTimeRequest(reqId, 'rejected', replyMsg);
-    setReplyingTo(null); setReplyMsg('');
-  };
-
-  const handleSendTeaTime = (toUserId: string, message: string) => {
-    const exists = db.teaTimeRequests.find(r =>
-      (r.fromUserId === currentUser!.id && r.toUserId === toUserId) ||
-      (r.fromUserId === toUserId && r.toUserId === currentUser!.id)
-    );
-    if (exists) { setSelectedUser(null); return; }
-    sendTeaTimeRequest({ id: Date.now().toString(), fromUserId: currentUser!.id, toUserId, message, status: 'pending' });
-    alert('티타임 요청을 보냈습니다.');
-    setSelectedUser(null);
   };
 
   const handleDownloadPDF = async () => {
@@ -155,7 +163,7 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
       pdf.save(`NetworkReport_${currentUser?.name || 'User'}.pdf`);
     } catch (e) {
       console.error(e);
-      alert('PDF 생성 중 오류가 발생했습니다.');
+      showToast('PDF 생성 중 오류가 발생했습니다.', 'error');
     } finally {
       setIsDownloading(false);
     }
@@ -164,24 +172,25 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
   // ─── render ────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-10" ref={contentRef}>
+      <Toast toast={toast} />
 
       {/* ── Page Header ── */}
       <div className="pb-3 border-b-2 border-primary/30 flex items-center justify-between">
         <div>
-          <h1 className="font-headline text-2xl font-black uppercase tracking-widest text-primary">MY NETWORK</h1>
-          <p className="text-xs text-on-surface-variant mt-0.5 font-medium">{currentUser?.name}님의 소셜 네트워크 분석</p>
+          <h1 className="font-headline text-3xl font-black uppercase tracking-widest text-primary">MY NETWORK</h1>
+          <p className="text-sm text-on-surface-variant mt-0.5 font-medium">{currentUser?.name}님의 소셜 네트워크 분석</p>
         </div>
         {!hideActions && (
           <div className="flex items-center gap-2">
             <button onClick={handleDownloadPDF} disabled={isDownloading}
               className={`w-9 h-9 rounded-full bg-white border border-outline flex items-center justify-center shadow-sm hover:bg-surface-container-low transition-all ${isDownloading ? 'opacity-50' : ''}`}
               title="PDF 다운로드">
-              <span className="material-symbols-outlined text-on-surface-variant text-lg">{isDownloading ? 'sync' : 'download'}</span>
+              <span className="material-symbols-outlined text-on-surface-variant text-xl">{isDownloading ? 'sync' : 'download'}</span>
             </button>
             <button onClick={handleRefresh} disabled={isRefreshing}
               className={`w-9 h-9 rounded-full bg-white border border-outline flex items-center justify-center shadow-sm hover:bg-surface-container-low transition-all ${isRefreshing ? 'animate-spin' : ''}`}
               title="새로고침">
-              <span className="material-symbols-outlined text-on-surface-variant text-lg">refresh</span>
+              <span className="material-symbols-outlined text-on-surface-variant text-xl">refresh</span>
             </button>
           </div>
         )}
@@ -191,28 +200,45 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
           1. SNA 유형 분석
       ════════════════════════════════════════════════════════════════════════ */}
       <section className="space-y-5">
-        {/* 타이틀: 풀네임 부분만 절반 크기로 */}
+        {/* 타이틀 */}
         <div className="flex items-center gap-2 pb-2 border-b border-outline/40">
-          <span className="material-symbols-outlined text-primary text-xl">analytics</span>
-          <h2 className="font-headline text-base font-black uppercase tracking-widest text-on-surface leading-tight">
+          <span className="material-symbols-outlined text-primary text-2xl">analytics</span>
+          <h2 className="font-headline text-lg font-black uppercase tracking-widest text-on-surface leading-tight">
             SNA
             <span className="text-[0.55em] font-semibold normal-case tracking-normal text-on-surface/60"> (Social Network Analysis)</span>
             {' '}유형 분석
           </h2>
         </div>
 
+        {/* 소개 문구 */}
+        <div className="bg-surface-container-low border border-outline/40 rounded-xl px-4 py-3 space-y-1.5">
+          <p className="text-xs text-on-surface-variant leading-relaxed">
+            소셜 네트워크 분석이란 개별 주체의 속성(나이, 성별 등)보다는 주체들 간의 <span className="font-bold text-on-surface">'관계(Relationship)'와 '구조(Structure)'</span>에 집중하여 사회적 현상을 정량적으로 분석하는 기법입니다.
+          </p>
+          <p className="text-xs text-on-surface-variant leading-relaxed">
+            점(Node)과 선(Link)으로 이루어진 데이터를 통해 집단 내의 정보 흐름이나 권력 지도를 시각화하고 통계적으로 증명합니다.
+          </p>
+          <p className="text-xs text-on-surface-variant leading-relaxed">
+            본 과정 내 리더들 간의 관심사 데이터를 종합 분석 결과, <span className="font-bold text-primary">{currentUser?.name}</span>님의 네트워크 유형은{' '}
+            {snaResult && !snaResult.allZero && snaResult.dominant
+              ? <><span className="font-bold text-primary">{snaResult.dominant.type}</span> 유형입니다.</>
+              : '아직 분석 중입니다.'
+            }
+          </p>
+        </div>
+
         {!snaResult ? (
-          <p className="text-xs text-on-surface-variant italic p-4 bg-surface rounded-xl border border-outline">
+          <p className="text-sm text-on-surface-variant italic p-4 bg-surface rounded-xl border border-outline">
             분석하기에 데이터가 부족합니다. 관심사를 등록하고 동료들과 연결되면 분석 결과를 확인할 수 있습니다.
           </p>
         ) : snaResult.allZero ? (
           /* 모든 점수가 0 → 유형 미결정 안내 */
           <div className="bg-surface-container-low border border-outline rounded-2xl p-6 space-y-4">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">🔍</span>
+              <span className="text-4xl">🔍</span>
               <div>
-                <p className="text-sm font-bold text-on-surface">아직 유형을 특정하기 어렵습니다</p>
-                <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                <p className="text-base font-bold text-on-surface">아직 유형을 특정하기 어렵습니다</p>
+                <p className="text-sm text-on-surface-variant mt-1 leading-relaxed">
                   데이터가 부족하여 네트워크 유형 분석이 불가합니다.<br />
                   관심 키워드를 등록하고 다른 리더들과 연결되면 정확한 유형을 확인할 수 있습니다.
                 </p>
@@ -224,13 +250,13 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                 <div key={idx} className="bg-surface border border-outline/50 rounded-xl p-3">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{t.icon}</span>
+                      <span className="text-xl">{t.icon}</span>
                       <div>
-                        <p className="text-xs font-bold text-on-surface/50">{t.type}</p>
-                        <p className="text-[9px] text-on-surface-variant/50 uppercase tracking-widest">{t.metricName}</p>
+                        <p className="text-sm font-bold text-on-surface/50">{t.type}</p>
+                        <p className="text-[11px] text-on-surface-variant/50 uppercase tracking-widest">{t.metricName}</p>
                       </div>
                     </div>
-                    <span className="text-sm font-black text-on-surface-variant/40">0</span>
+                    <span className="text-base font-black text-on-surface-variant/40">0</span>
                   </div>
                   <div className="h-1.5 bg-surface-container-low rounded-full" />
                 </div>
@@ -240,49 +266,66 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
         ) : (
           <>
             {/* Dominant type card */}
-            <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6 flex gap-4 items-start">
-              <div className="text-4xl shrink-0">{snaResult.dominant!.icon}</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest mb-0.5">{snaResult.dominant!.metricName} 최고</p>
-                <div className="flex items-baseline gap-2 mb-2">
-                  <h3 className="text-xl font-black text-primary">{snaResult.dominant!.type} 유형</h3>
-                  <span className="text-2xl font-black text-primary">{snaResult.dominant!.score.toFixed(0)}</span>
-                  <span className="text-[10px] text-primary/50 font-bold">/ 100</span>
+            {(() => {
+              const rich = SNA_RICH_DESCRIPTIONS[snaResult.dominant!.type];
+              return (
+                <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6 space-y-4">
+                  <div className="flex gap-4 items-start">
+                    <div className="text-5xl shrink-0">{snaResult.dominant!.icon}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-primary/60 uppercase tracking-widest mb-0.5">{snaResult.dominant!.metricName} 최고</p>
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <h3 className="text-2xl font-black text-primary">{snaResult.dominant!.type} 유형</h3>
+                        <span className="text-3xl font-black text-primary">{snaResult.dominant!.score.toFixed(0)}</span>
+                        <span className="text-xs text-primary/50 font-bold">/ 100</span>
+                      </div>
+                      {rich && <p className="text-xs font-bold text-primary/70 italic">{rich.subtitle}</p>}
+                      <p className="text-xs text-primary/60 mt-1">{snaResult.dominant!.detail}</p>
+                    </div>
+                  </div>
+                  {rich && (
+                    <div className="space-y-2 pt-2 border-t border-primary/20">
+                      {rich.sections.map(sec => (
+                        <div key={sec.label}>
+                          <span className="text-[11px] font-black text-primary uppercase tracking-widest">{sec.label} </span>
+                          <span className="text-xs text-on-surface-variant leading-relaxed">{sec.content}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-on-surface-variant leading-relaxed">{snaResult.dominant!.description}</p>
-                <p className="text-[10px] text-primary/70 font-medium mt-2">{snaResult.dominant!.detail}</p>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* 나머지 유형 bars (dominant 제외) */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               {snaResult.types.filter(t => t.type !== snaResult.dominant!.type).map((t, idx) => (
-                <div key={idx} className="bg-surface border border-outline rounded-xl p-4 space-y-2">
+                <div key={idx} className="bg-surface border border-outline rounded-xl p-4 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{t.icon}</span>
                       <div>
-                        <p className="text-sm font-bold text-on-surface">{t.type}</p>
-                        <p className="text-[9px] text-on-surface-variant uppercase tracking-widest">{t.metricName}</p>
+                        <p className="text-base font-bold text-on-surface">{t.type}</p>
+                        <p className="text-[11px] text-on-surface-variant uppercase tracking-widest">{t.metricName}</p>
                       </div>
                     </div>
-                    <span className={`text-base font-black ${t.type === snaResult.dominant!.type ? 'text-primary' : 'text-on-surface-variant'}`}>
-                      {t.score.toFixed(0)}
-                    </span>
+                    <div className="flex items-baseline gap-1 shrink-0">
+                      <span className="text-lg font-black text-on-surface-variant">{t.score.toFixed(0)}</span>
+                      <span className="text-[11px] text-on-surface-variant/50 font-bold">/ 100</span>
+                    </div>
                   </div>
-                  <div className="h-2 bg-surface-container-low rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ${t.type === snaResult.dominant!.type ? 'bg-primary' : 'bg-on-surface-variant/30'}`}
-                      style={{ width: `${Math.max(2, t.score)}%` }}
-                    />
+                  <div className="h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-on-surface-variant/25 transition-all duration-700"
+                      style={{ width: `${Math.max(2, t.score)}%` }} />
                   </div>
-                  {/* 산출 데이터 */}
-                  <p className="text-[10px] text-on-surface-variant">{t.detail}</p>
-                  {/* 지표 산출 방식 */}
-                  <div className="pt-1 border-t border-outline/30">
-                    <p className="text-[10px] font-bold text-on-surface-variant/70 mb-0.5 uppercase tracking-widest">{t.metricName} 점수 산출 방식</p>
-                    <p className="text-[10px] text-on-surface-variant/80 leading-relaxed">{SNA_METRIC_EXPLANATIONS[t.type]}</p>
-                  </div>
+                  {t.detail && (
+                    <p className="text-xs font-bold text-on-surface-variant/60 leading-relaxed">
+                      {t.detail}
+                    </p>
+                  )}
+                  <p className="text-xs text-on-surface-variant/80 leading-relaxed">
+                    {SNA_SHORT_DESCRIPTIONS[t.type]}
+                  </p>
                 </div>
               ))}
             </div>
@@ -291,164 +334,16 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════════
-          2. 티타임 현황
-      ════════════════════════════════════════════════════════════════════════ */}
-      <section className="space-y-5">
-        <SectionTitle icon="coffee_maker" title="티타임 현황" />
-
-        <div className="grid grid-cols-2 gap-3 mb-2">
-          <div className="bg-surface p-4 rounded-xl border border-outline/50 text-center">
-            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">받은 요청</p>
-            <span className="text-2xl font-bold text-tertiary">{receivedRequests.length}</span>
-            <p className="text-[10px] text-on-surface-variant mt-0.5">회</p>
-          </div>
-          <div className="bg-surface p-4 rounded-xl border border-outline/50 text-center">
-            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">보낸 요청</p>
-            <span className="text-2xl font-bold text-secondary">{sentRequests.length}</span>
-            <p className="text-[10px] text-on-surface-variant mt-0.5">회</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Received */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-sm">call_received</span> 받은 요청
-            </h3>
-            {receivedRequests.length === 0 ? (
-              <p className="text-xs text-on-surface-variant italic p-4 bg-surface rounded-xl border border-outline">받은 요청이 없습니다.</p>
-            ) : (
-              receivedRequests.map(req => {
-                const fromUser = db.users.find(u => u.id === req.fromUserId);
-                if (!fromUser) return null;
-                const isHandled = req.status !== 'pending';
-                return (
-                  <div key={req.id} className={`p-4 rounded-2xl border border-outline shadow-sm space-y-3 transition-opacity ${isHandled ? 'bg-surface/50 opacity-80' : 'bg-surface'}`}>
-                    <div className="flex gap-3 items-start">
-                      <div className="w-10 h-10 rounded-lg bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0 border border-outline">
-                        {fromUser.profilePic
-                          ? <img src={fromUser.profilePic} className="w-full h-full object-cover" />
-                          : <span className="font-bold text-primary text-xs">{fromUser.name.charAt(0)}</span>}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start gap-2">
-                          <h3 className="font-bold text-on-surface text-xs truncate">{fromUser.name}</h3>
-                          {isHandled && (
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${req.status === 'accepted' ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
-                              {req.status === 'accepted' ? '수락됨' : '거절됨'}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-on-surface-variant truncate">{fromUser.title}</p>
-                        <div className="mt-1 space-y-1">
-                          {req.message.includes('\n\n') ? (
-                            <>
-                              <div className="flex flex-wrap gap-1">
-                                {req.message.split('\n\n')[0].split(' ').filter(t => t.startsWith('#')).map((tag, idx) => (
-                                  <span key={idx} className="text-[9px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10 uppercase">{tag}</span>
-                                ))}
-                              </div>
-                              <p className="text-[10px] text-on-surface-variant italic line-clamp-2">"{req.message.split('\n\n')[1]}"</p>
-                            </>
-                          ) : (
-                            <p className="text-[10px] text-on-surface-variant italic line-clamp-2">"{req.message}"</p>
-                          )}
-                        </div>
-                        {isHandled && req.responseMessage && (
-                          <div className="mt-2 p-2 bg-surface-container-low rounded-lg border border-outline/30">
-                            <p className="text-[9px] font-bold text-primary mb-0.5 flex items-center gap-1">
-                              <span className="material-symbols-outlined text-[10px]">reply</span> 나의 응답
-                            </p>
-                            <p className="text-[10px] text-on-surface italic">"{req.responseMessage}"</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {!isHandled && (
-                      replyingTo === req.id ? (
-                        <div className="space-y-2 pt-2 border-t border-outline">
-                          <textarea value={replyMsg} onChange={e => setReplyMsg(e.target.value)} placeholder="응답 메시지..." className="w-full bg-surface-container-low border border-outline rounded-lg p-2 text-xs outline-none focus:border-primary" rows={2} />
-                          <div className="flex gap-2">
-                            <button onClick={() => setReplyingTo(null)} className="flex-1 py-1.5 text-[10px] font-bold border border-outline rounded-lg">취소</button>
-                            <button onClick={() => handleAccept(req.id)} className="flex-1 py-1.5 text-[10px] font-bold bg-primary text-on-primary rounded-lg">수락</button>
-                            <button onClick={() => handleReject(req.id)} className="flex-1 py-1.5 text-[10px] font-bold border border-outline rounded-lg">거절</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2 pt-2">
-                          <button onClick={() => setReplyingTo(req.id)} className="flex-1 py-1.5 text-[10px] font-bold bg-primary text-on-primary rounded-lg">응답하기</button>
-                        </div>
-                      )
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Sent */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-sm">call_made</span> 보낸 요청
-            </h3>
-            {sentRequests.length === 0 ? (
-              <p className="text-xs text-on-surface-variant italic p-4 bg-surface rounded-xl border border-outline">보낸 요청이 없습니다.</p>
-            ) : (
-              sentRequests.map(req => {
-                const toUser = db.users.find(u => u.id === req.toUserId);
-                if (!toUser) return null;
-                return (
-                  <div key={req.id} className="p-4 rounded-2xl border border-outline bg-surface shadow-sm space-y-3">
-                    <div className="flex gap-3 items-start">
-                      <div className="w-10 h-10 rounded-lg bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0 border border-outline">
-                        {toUser.profilePic
-                          ? <img src={toUser.profilePic} className="w-full h-full object-cover" />
-                          : <span className="font-bold text-primary text-xs">{toUser.name.charAt(0)}</span>}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start gap-2">
-                          <h3 className="font-bold text-on-surface text-xs truncate">{toUser.name}</h3>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${req.status === 'accepted' ? 'bg-primary/10 text-primary' : req.status === 'rejected' ? 'bg-surface-variant text-on-surface-variant' : 'bg-tertiary/10 text-tertiary'}`}>
-                            {req.status === 'accepted' ? '수락됨' : req.status === 'rejected' ? '거절됨' : '대기 중'}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-on-surface-variant truncate">{toUser.title}</p>
-                        <div className="mt-1">
-                          {req.message.includes('\n\n') ? (
-                            <p className="text-[10px] text-on-surface-variant italic line-clamp-2">"{req.message.split('\n\n')[1]}"</p>
-                          ) : (
-                            <p className="text-[10px] text-on-surface-variant italic line-clamp-2">"{req.message}"</p>
-                          )}
-                        </div>
-                        {req.status !== 'pending' && req.responseMessage && (
-                          <div className="mt-2 p-2 bg-surface-container-low rounded-lg border border-outline/30">
-                            <p className="text-[9px] font-bold text-secondary mb-0.5 flex items-center gap-1">
-                              <span className="material-symbols-outlined text-[10px]">chat_bubble</span> 상대방의 응답
-                            </p>
-                            <p className="text-[10px] text-on-surface italic">"{req.responseMessage}"</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════════════════════════════════════
-          3. 네트워크 추천 리더
+          2. 네트워크 추천 리더
       ════════════════════════════════════════════════════════════════════════ */}
       <section className="space-y-5">
         <SectionTitle icon="star" title="네트워크 추천 리더" badge="연결 키워드 2개 이상" />
-        <p className="text-xs text-on-surface-variant font-medium -mt-2">
+        <p className="text-sm text-on-surface-variant font-medium -mt-2">
           {currentUser?.name}님과 공통 키워드가 2개 이상인 리더입니다. 아이콘을 클릭해 티타임을 요청해보세요.
         </p>
 
         {recommendedLeaders.length === 0 ? (
-          <p className="text-xs text-on-surface-variant italic p-4 bg-surface-container rounded-xl border border-outline-variant/10">
+          <p className="text-sm text-on-surface-variant italic p-4 bg-surface-container rounded-xl border border-outline-variant/10">
             아직 2개 이상 공통 키워드를 가진 리더가 없습니다.
           </p>
         ) : (
@@ -466,18 +361,23 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                     >
                       {u.profilePic
                         ? <img src={u.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        : <span className="text-base font-bold text-primary">{u.name.charAt(0)}</span>}
+                        : <span className="text-lg font-bold text-primary">{u.name.charAt(0)}</span>}
                     </button>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-on-surface-variant truncate uppercase font-medium">{u.company} · {u.department}</p>
+                      <p className="text-xs text-on-surface-variant truncate uppercase font-medium">{u.company} · {u.department}</p>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-on-surface">{u.name}</p>
-                        <span className="text-[9px] font-black bg-primary text-on-primary px-2 py-0.5 rounded-full">공통 {count}개</span>
+                        <p className="text-base font-bold text-on-surface">{u.name}</p>
+                        <span className="text-[11px] font-black bg-primary text-on-primary px-2 py-0.5 rounded-full">공통 {count}개</span>
                       </div>
-                      <p className="text-[10px] text-on-surface-variant truncate">{u.title}</p>
+                      <p className="text-xs text-on-surface-variant truncate">{u.title}</p>
+                      {u.location && (
+                        <p className="text-xs text-on-surface-variant/60 flex items-center gap-0.5 mt-0.5 truncate">
+                          <span className="material-symbols-outlined text-sm">location_on</span>{u.location}
+                        </p>
+                      )}
                     </div>
                     {sentReq ? (
-                      <span className={`shrink-0 text-[10px] font-bold px-3 py-1.5 rounded-lg border ${
+                      <span className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg border ${
                         sentReq.status === 'accepted' ? 'bg-green-50 text-green-700 border-green-200' :
                         sentReq.status === 'rejected' ? 'bg-surface-container text-on-surface-variant border-outline/40' :
                         'bg-blue-50 text-blue-600 border-blue-200'
@@ -487,7 +387,7 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                     ) : receivedReq ? (
                       <button
                         onClick={() => setReplyingToReq(receivedReq)}
-                        className={`shrink-0 text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-colors ${
+                        className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${
                           receivedReq.status === 'pending'
                             ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600'
                             : receivedReq.status === 'accepted'
@@ -500,7 +400,7 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                     ) : (
                       <button
                         onClick={() => setSelectedUser(u)}
-                        className="shrink-0 text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors"
+                        className="shrink-0 text-xs font-bold bg-primary/10 text-primary border border-primary/20 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors"
                       >
                         티타임 요청
                       </button>
@@ -508,20 +408,20 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                   </div>
 
                   <div className="mb-3">
-                    <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">공통 키워드</p>
+                    <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">공통 키워드</p>
                     <div className="flex flex-wrap gap-1.5">
                       {keywords.map((kw, idx) => (
-                        <span key={idx} className="text-[10px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/20 italic">{kw}</span>
+                        <span key={idx} className="text-xs font-black text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/20 italic">{kw}</span>
                       ))}
                     </div>
                   </div>
 
                   {uInterests.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">등록한 관심사</p>
+                      <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">등록한 관심사</p>
                       <div className="flex flex-wrap gap-1.5">
                         {uInterests.map((i: Interest) => (
-                          <span key={i.id} className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${i.type === 'giver' ? 'bg-primary/5 text-primary border-primary/20' : 'bg-secondary/5 text-secondary border-secondary/20'}`}>
+                          <span key={i.id} className={`text-xs px-2 py-0.5 rounded-full font-bold border ${i.type === 'giver' ? 'bg-primary/5 text-primary border-primary/20' : 'bg-secondary/5 text-secondary border-secondary/20'}`}>
                             #{i.keyword} <span className="opacity-60">{i.type === 'giver' ? 'G' : 'T'}</span>
                           </span>
                         ))}
@@ -540,12 +440,12 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
       ════════════════════════════════════════════════════════════════════════ */}
       <section className="space-y-5">
         <SectionTitle icon="local_fire_department" title="HOT KEYWORDS" badge="Top 5" />
-        <p className="text-xs text-on-surface-variant font-medium -mt-2">
+        <p className="text-sm text-on-surface-variant font-medium -mt-2">
           이번 과정에서 가장 많은 리더들이 관심을 가진 키워드입니다. 키워드를 클릭하면 상세 내용을 확인할 수 있어요.
         </p>
 
         {hotKeywords.length === 0 ? (
-          <p className="text-xs text-on-surface-variant italic p-4 bg-surface rounded-xl border border-outline">키워드 데이터가 없습니다.</p>
+          <p className="text-sm text-on-surface-variant italic p-4 bg-surface rounded-xl border border-outline">키워드 데이터가 없습니다.</p>
         ) : (
           <div className="space-y-3">
             {hotKeywords.map((kw, idx) => {
@@ -563,11 +463,11 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                   className="w-full bg-surface border border-outline rounded-2xl p-4 hover:border-primary/40 hover:shadow-md transition-all text-left group"
                 >
                   <div className="flex items-center gap-3 mb-3">
-                    <span className="text-xl shrink-0">{medals[idx]}</span>
+                    <span className="text-2xl shrink-0">{medals[idx]}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-bold text-on-surface text-sm group-hover:text-primary transition-colors">#{kw.displayName}</h3>
-                        <span className="text-[10px] text-on-surface-variant shrink-0">{total}명 관심</span>
+                        <h3 className="font-bold text-on-surface text-base group-hover:text-primary transition-colors">#{kw.displayName}</h3>
+                        <span className="text-xs text-on-surface-variant shrink-0">{total}명 관심</span>
                       </div>
                     </div>
                   </div>
@@ -578,7 +478,7 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                       <div className="bg-primary rounded-full transition-all duration-500" style={{ width: `${giverPct}%` }} />
                       <div className="bg-secondary rounded-full transition-all duration-500" style={{ width: `${takerPct}%` }} />
                     </div>
-                    <div className="flex justify-between text-[9px] font-bold">
+                    <div className="flex justify-between text-[11px] font-bold">
                       <span className="text-primary">Giver {giverCount}명 ({giverPct}%)</span>
                       <span className="text-secondary">Taker {takerCount}명 ({takerPct}%)</span>
                     </div>
@@ -598,9 +498,9 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
           <div className="bg-surface p-6 rounded-2xl border border-outline max-w-md w-full shadow-2xl max-h-[85vh] overflow-y-auto scrollbar-hide" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-start mb-5">
               <div>
-                <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold mb-0.5">HOT KEYWORD</p>
-                <h3 className="text-xl font-black text-primary">#{selectedKeyword.displayName}</h3>
-                <p className="text-xs text-on-surface-variant mt-0.5">총 {selectedKeyword.total}명 관심</p>
+                <p className="text-xs text-on-surface-variant uppercase tracking-widest font-bold mb-0.5">HOT KEYWORD</p>
+                <h3 className="text-2xl font-black text-primary">#{selectedKeyword.displayName}</h3>
+                <p className="text-sm text-on-surface-variant mt-0.5">총 {selectedKeyword.total}명 관심</p>
               </div>
               <button onClick={() => setSelectedKeyword(null)} className="text-on-surface-variant hover:text-on-surface">
                 <span className="material-symbols-outlined">close</span>
@@ -611,8 +511,8 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
               {/* Givers */}
               {selectedKeyword.givers.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm">volunteer_activism</span>
+                  <h4 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base">volunteer_activism</span>
                     Giver ({selectedKeyword.givers.length}명)
                   </h4>
                   <div className="space-y-2">
@@ -625,14 +525,19 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                             <div className="w-7 h-7 rounded-lg bg-primary/10 overflow-hidden flex items-center justify-center shrink-0 border border-primary/20">
                               {user.profilePic
                                 ? <img src={user.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                : <span className="text-xs font-bold text-primary">{user.name.charAt(0)}</span>}
+                                : <span className="text-sm font-bold text-primary">{user.name.charAt(0)}</span>}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-xs font-bold text-on-surface truncate">{user.name}</p>
-                              <p className="text-[9px] text-on-surface-variant truncate">{user.company} · {user.title}</p>
+                              <p className="text-sm font-bold text-on-surface truncate">{user.name}</p>
+                              <p className="text-[11px] text-on-surface-variant truncate">{user.company} · {user.department} · {user.title}</p>
+                              {user.location && (
+                                <p className="text-[11px] text-on-surface-variant/60 flex items-center gap-0.5 truncate">
+                                  <span className="material-symbols-outlined text-xs">location_on</span>{user.location}
+                                </p>
+                              )}
                             </div>
                           </div>
-                          {i.description && <p className="text-[10px] text-on-surface-variant leading-relaxed italic">"{i.description}"</p>}
+                          {i.description && <p className="text-xs text-on-surface-variant leading-relaxed italic">"{i.description}"</p>}
                         </div>
                       );
                     })}
@@ -643,8 +548,8 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
               {/* Takers */}
               {selectedKeyword.takers.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-secondary uppercase tracking-widest flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm">pan_tool</span>
+                  <h4 className="text-sm font-bold text-secondary uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base">pan_tool</span>
                     Taker ({selectedKeyword.takers.length}명)
                   </h4>
                   <div className="space-y-2">
@@ -657,14 +562,19 @@ export default function MyNetwork({ targetUser, hideActions = false }: MyNetwork
                             <div className="w-7 h-7 rounded-lg bg-secondary/10 overflow-hidden flex items-center justify-center shrink-0 border border-secondary/20">
                               {user.profilePic
                                 ? <img src={user.profilePic} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                : <span className="text-xs font-bold text-secondary">{user.name.charAt(0)}</span>}
+                                : <span className="text-sm font-bold text-secondary">{user.name.charAt(0)}</span>}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-xs font-bold text-on-surface truncate">{user.name}</p>
-                              <p className="text-[9px] text-on-surface-variant truncate">{user.company} · {user.title}</p>
+                              <p className="text-sm font-bold text-on-surface truncate">{user.name}</p>
+                              <p className="text-[11px] text-on-surface-variant truncate">{user.company} · {user.department} · {user.title}</p>
+                              {user.location && (
+                                <p className="text-[11px] text-on-surface-variant/60 flex items-center gap-0.5 truncate">
+                                  <span className="material-symbols-outlined text-xs">location_on</span>{user.location}
+                                </p>
+                              )}
                             </div>
                           </div>
-                          {i.description && <p className="text-[10px] text-on-surface-variant leading-relaxed italic">"{i.description}"</p>}
+                          {i.description && <p className="text-xs text-on-surface-variant leading-relaxed italic">"{i.description}"</p>}
                         </div>
                       );
                     })}

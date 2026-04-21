@@ -1,7 +1,9 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore, User, Interest } from '../store';
 import * as d3 from 'd3';
 import { motion, AnimatePresence } from 'motion/react';
+import { useToast } from '../hooks/useToast';
+import Toast from './Toast';
 interface PeopleNode extends d3.SimulationNodeDatum {
   id: string;        // user id
   label: string;
@@ -16,6 +18,7 @@ interface PeopleLink extends d3.SimulationLinkDatum<PeopleNode> {
 export default function PeopleMap({ adminCourseId }: { adminCourseId?: string }) {
   const { db, currentUser, sendTeaTimeRequest, fetchData } = useStore();
   const effectiveCourseId = adminCourseId || currentUser?.courseId;
+  const { toast, showToast } = useToast();
 
   // ── refs & state ────────────────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);
@@ -73,19 +76,22 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
 
+    // 관심사 등록한 유저만 포함
+    const usersWithInterests = courseUsers.filter(u => (userKeywordMap.get(u.id)?.size || 0) > 0);
+
     // 유저 모드: 본인 + 연결된 유저만 표시 / 관리자 모드: 전체 표시
-    let visibleUsers = courseUsers;
+    let visibleUsers = usersWithInterests;
     if (!adminCourseId && currentUser) {
       const myKws = userKeywordMap.get(currentUser.id) || new Set<string>();
       const connectedIds = new Set<string>([currentUser.id]);
-      courseUsers.forEach(u => {
+      usersWithInterests.forEach(u => {
         if (u.id === currentUser.id) return;
         const theirKws = userKeywordMap.get(u.id) || new Set<string>();
         for (const kw of myKws) {
           if (theirKws.has(kw)) { connectedIds.add(u.id); break; }
         }
       });
-      visibleUsers = courseUsers.filter(u => connectedIds.has(u.id));
+      visibleUsers = usersWithInterests.filter(u => connectedIds.has(u.id));
     }
 
     // Build nodes
@@ -96,10 +102,15 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
       data: u,
     }));
 
-    // Build links: connect every pair sharing ≥1 keyword
+    // Build links: 유저 모드에서는 나와의 연결만, 관리자 모드에서는 전체 연결
     const simLinks: PeopleLink[] = [];
     for (let i = 0; i < visibleUsers.length; i++) {
       for (let j = i + 1; j < visibleUsers.length; j++) {
+        if (!adminCourseId && currentUser) {
+          const iIsMe = visibleUsers[i].id === currentUser.id;
+          const jIsMe = visibleUsers[j].id === currentUser.id;
+          if (!iIsMe && !jIsMe) continue;
+        }
         const kwA = userKeywordMap.get(visibleUsers[i].id) || new Set<string>();
         const kwB = userKeywordMap.get(visibleUsers[j].id) || new Set<string>();
         let shared = 0;
@@ -208,12 +219,12 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
 
   // ── tea time ───────────────────────────────────────────────────────────────
   const handleSendTeaTime = (toUserId: string) => {
-    if (!teaTimeMsg.trim()) { alert('메시지를 입력해주세요.'); return; }
+    if (!teaTimeMsg.trim()) { showToast('메시지를 입력해주세요.', 'error'); return; }
     const hashtags = myInterests.map(i => `#${i.keyword}`).join(' ');
     sendTeaTimeRequest({ id: Date.now().toString(), fromUserId: currentUser!.id, toUserId, message: `${hashtags}\n\n${teaTimeMsg}`, status: 'pending' });
-    alert('티타임 요청을 보냈습니다.');
     setTeaTimeMsg('');
     setSelectedUser(null);
+    showToast('티타임 요청을 보냈습니다.', 'success');
   };
 
   const handleRefresh = async () => {
@@ -234,6 +245,7 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
       ref={containerRef}
       className={`${isFullScreen ? 'fixed inset-0 z-[9999] w-screen h-screen' : `relative w-full ${adminCourseId ? 'h-[800px]' : 'h-full'}`} bg-background overflow-hidden select-none touch-none`}
     >
+      <Toast toast={toast} />
       {/* SVG canvas */}
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing">
         <g transform={transform.toString()}>
@@ -259,7 +271,7 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
                     x={mx} y={my}
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fontSize={9}
+                    fontSize={11}
                     fontWeight="bold"
                     fill="#00aad2"
                     style={{ paintOrder: 'stroke', stroke: '#ffffff', strokeWidth: '2px' }}
@@ -301,7 +313,7 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
               <text
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fontSize={10}
+                fontSize={12}
                 fontWeight="bold"
                 fill="white"
                 pointerEvents="none"
@@ -312,7 +324,7 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
               <text
                 textAnchor="middle"
                 dy={26}
-                fontSize={10}
+                fontSize={12}
                 fontWeight="bold"
                 fill={node.isMe ? '#1d4ed8' : '#1c1c1c'}
                 pointerEvents="none"
@@ -343,8 +355,8 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
       <div className="absolute top-4 left-4 flex flex-col gap-3 z-30">
         {/* Legend */}
         <div className="bg-white/80 backdrop-blur-md px-4 py-3 rounded-xl border border-outline shadow-sm space-y-2">
-          <div className="text-[10px] uppercase tracking-widest text-on-surface-variant font-black">People Map</div>
-          <div className="flex flex-col gap-1.5 text-[10px] text-on-surface-variant font-medium">
+          <div className="text-xs uppercase tracking-widest text-on-surface-variant font-black">People Map</div>
+          <div className="flex flex-col gap-1.5 text-xs text-on-surface-variant font-medium">
             <div className="flex items-center gap-2">
               <div className="w-8 h-1 rounded-full bg-[#00aad2]" style={{ opacity: 0.9 }} />
               <span>굵을수록 공유 키워드 多</span>
@@ -363,17 +375,17 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
         {/* Zoom buttons */}
         <div className="bg-white/80 backdrop-blur-md p-2 rounded-xl border border-outline/20 shadow-sm flex flex-col gap-2 w-fit">
           <button onClick={handleZoomIn} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-surface-container-highest transition-colors text-on-surface-variant" title="Zoom In">
-            <span className="material-symbols-outlined text-lg">add</span>
+            <span className="material-symbols-outlined text-xl">add</span>
           </button>
           <div className="h-px bg-outline/10 mx-1" />
           <button onClick={handleZoomOut} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-surface-container-highest transition-colors text-on-surface-variant" title="Zoom Out">
-            <span className="material-symbols-outlined text-lg">remove</span>
+            <span className="material-symbols-outlined text-xl">remove</span>
           </button>
           <div className="h-px bg-outline/10 mx-1" />
           <button onClick={handleReset} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-surface-container-highest transition-colors text-on-surface-variant" title="Reset">
-            <span className="material-symbols-outlined text-lg">restart_alt</span>
+            <span className="material-symbols-outlined text-xl">restart_alt</span>
           </button>
-          <div className="text-[9px] font-bold text-center text-on-surface-variant/60">{Math.round(transform.k * 100)}%</div>
+          <div className="text-[11px] font-bold text-center text-on-surface-variant/60">{Math.round(transform.k * 100)}%</div>
         </div>
       </div>
 
@@ -381,7 +393,7 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
       {nodes.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/40 gap-3">
           <span className="material-symbols-outlined text-6xl">group_off</span>
-          <p className="text-sm font-bold">
+          <p className="text-base font-bold">
             {courseUsers.length === 0
               ? '등록된 리더가 없습니다.'
               : '아직 연결된 리더가 없습니다. 관심 키워드를 등록해보세요.'}
@@ -415,9 +427,14 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
                       : <span className="material-symbols-outlined text-6xl text-primary/40">face</span>}
                   </div>
                   <div>
-                    <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">{selectedUser.company} · {selectedUser.department}</p>
-                    <h3 className="font-headline font-black text-xl text-on-surface uppercase tracking-tight">{selectedUser.name}</h3>
-                    <p className="text-sm text-secondary font-black uppercase tracking-widest">{selectedUser.title}</p>
+                    <p className="text-xs text-on-surface-variant uppercase font-bold tracking-widest">{selectedUser.company} · {selectedUser.department}</p>
+                    <h3 className="font-headline font-black text-2xl text-on-surface uppercase tracking-tight">{selectedUser.name}</h3>
+                    <p className="text-base text-secondary font-black uppercase tracking-widest">{selectedUser.title}</p>
+                    {selectedUser.location && (
+                      <p className="text-xs text-on-surface-variant/70 flex items-center gap-0.5 mt-0.5">
+                        <span className="material-symbols-outlined text-sm">location_on</span>{selectedUser.location}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <button onClick={() => setSelectedUser(null)} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-highest transition-colors">
@@ -432,8 +449,8 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
                 const shared = [...myKws].filter(k => theirKws.has(k)).length;
                 return shared > 0 ? (
                   <div className="mb-4 px-3 py-2 bg-primary/5 border border-primary/20 rounded-xl">
-                    <p className="text-xs font-bold text-primary">
-                      나와 공유 키워드 <span className="text-lg">{shared}</span>개
+                    <p className="text-sm font-bold text-primary">
+                      나와 공유 키워드 <span className="text-xl">{shared}</span>개
                     </p>
                   </div>
                 ) : null;
@@ -446,41 +463,42 @@ export default function PeopleMap({ adminCourseId }: { adminCourseId?: string })
                   if (items.length === 0) return null;
                   return (
                     <div key={type} className="space-y-2">
-                      <h4 className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${type === 'giver' ? 'text-primary' : 'text-secondary'}`}>
-                        <span className="material-symbols-outlined text-sm">{type === 'giver' ? 'volunteer_activism' : 'pan_tool'}</span>
-                        {type === 'giver' ? 'be Giver' : 'be Taker'}
+                      <h4 className={`flex items-center gap-1.5 min-w-0 overflow-hidden ${type === 'giver' ? 'text-primary' : 'text-secondary'}`}>
+                        <span className="material-symbols-outlined text-base shrink-0">{type === 'giver' ? 'volunteer_activism' : 'pan_tool'}</span>
+                        <span className="text-xs font-bold uppercase tracking-widest shrink-0">{type === 'giver' ? 'Giver' : 'Taker'}</span>
+                        <span className="text-[11px] font-normal normal-case tracking-normal text-on-surface-variant truncate">· {type === 'giver' ? '도움을 드릴 수 있어요.' : '도움을 받고 싶어요.'}</span>
                       </h4>
                       {items.map(i => (
                         <div key={i.id} className="bg-surface-container-low p-3 rounded-xl border border-outline">
-                          <p className={`text-sm font-bold mb-1 ${type === 'giver' ? 'text-primary' : 'text-secondary'}`}>#{i.keyword}</p>
-                          <p className="text-xs text-on-surface-variant">{i.description}</p>
+                          <p className={`text-base font-bold mb-1 ${type === 'giver' ? 'text-primary' : 'text-secondary'}`}>#{i.keyword}</p>
+                          <p className="text-sm text-on-surface-variant">{i.description}</p>
                         </div>
                       ))}
                     </div>
                   );
                 })}
                 {selectedUserInterests.length === 0 && (
-                  <p className="text-xs text-on-surface-variant/50 italic">등록된 관심사가 없습니다.</p>
+                  <p className="text-sm text-on-surface-variant/50 italic">등록된 관심사가 없습니다.</p>
                 )}
               </div>
 
               {/* Tea time request (유저 모드 전용) */}
               {!adminCourseId && currentUser && selectedUser.id !== currentUser.id && (
                 <div className="space-y-3 pt-4 border-t border-outline">
-                  <h4 className="text-xs font-bold text-on-surface uppercase tracking-widest">티타임 요청</h4>
-                  <p className="text-[10px] text-on-surface-variant">
+                  <h4 className="text-sm font-bold text-on-surface uppercase tracking-widest">티타임 요청</h4>
+                  <p className="text-xs text-on-surface-variant">
                     {selectedUser.name}님에게 구체적인 일정과 장소를 기재하여 티타임을 제안해보세요.
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {myInterests.map(i => (
-                      <span key={i.id} className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-md border border-primary/20">#{i.keyword}</span>
+                      <span key={i.id} className="px-2 py-1 bg-primary/10 text-primary text-xs font-bold rounded-md border border-primary/20">#{i.keyword}</span>
                     ))}
                   </div>
                   <textarea
                     value={teaTimeMsg}
                     onChange={e => setTeaTimeMsg(e.target.value)}
                     placeholder={`${selectedUser.name}님에게 보낼 메시지를 작성하세요...`}
-                    className="w-full bg-surface-container-low border border-outline rounded-xl p-4 text-sm resize-none outline-none focus:border-primary"
+                    className="w-full bg-surface-container-low border border-outline rounded-xl p-4 text-base resize-none outline-none focus:border-primary"
                     rows={3}
                   />
                   <button
