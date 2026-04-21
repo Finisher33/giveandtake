@@ -335,19 +335,21 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
   };
 
   // ── 드래그 (패닝) ─────────────────────────────────────────────────────────────
-  // 드래그 중 setBubblePan을 호출하지 않고 DOM을 직접 업데이트 → React 리렌더 없이 매끄러운 이동
-  // 드래그 종료 시 한 번만 setBubblePan으로 React state 동기화
+  // onPointerDownCapture: 캡처 단계에서 실행 → Framer Motion의 버블 stopPropagation보다 먼저 실행
+  // 모바일에서 버블 위를 터치해도 드래그가 정상 동작하는 핵심 이유
   const handleBubblePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // 멀티터치(핀치) 시작 시 패닝 무시
+    if (e.button !== 0) return;
     activePointers.current.add(e.pointerId);
-    if (activePointers.current.size > 1 || e.button !== 0) return;
+    if (activePointers.current.size > 1) return;
 
     const pid = e.pointerId;
     setIsBubbleDragging(true);
     bubbleDragDist.current = 0;
-    // liveState에서 현재 위치 참조 (stale state 방지)
     bubbleDragRef.current = { x: e.clientX, y: e.clientY, px: liveState.current.x, py: liveState.current.y };
 
     const onMove = (me: PointerEvent) => {
+      if (me.pointerId !== pid) return;
       if (activePointers.current.size > 1) return;
       const dx = me.clientX - bubbleDragRef.current.x;
       const dy = me.clientY - bubbleDragRef.current.y;
@@ -356,21 +358,28 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
       const ny = bubbleDragRef.current.py + dy;
       liveState.current.x = nx;
       liveState.current.y = ny;
-      // React state 업데이트 없이 DOM 직접 변경
       if (panLayerRef.current) {
         panLayerRef.current.style.transform = `translate(${nx}px, ${ny}px) scale(${liveState.current.zoom})`;
       }
     };
-    const onUp = () => {
+
+    const cleanup = () => {
       activePointers.current.delete(pid);
       setIsBubbleDragging(false);
-      // 드래그 종료 후 한 번만 React state 동기화
       setBubblePan({ x: liveState.current.x, y: liveState.current.y });
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
+    const onUp = (ue: PointerEvent) => {
+      if (ue.pointerId !== pid) return;
+      cleanup();
+    };
+
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    // pointercancel: 모바일 브라우저가 제스처를 강제 취소할 때 cleanup
+    window.addEventListener('pointercancel', onUp);
   };
 
   // 드래그였으면 버블 클릭 무시 (캡처 단계에서 차단)
@@ -722,7 +731,7 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
                     ref={setBubbleContainerEl}
                     className={`relative w-full ${isBubbleFullScreen ? 'h-[calc(100dvh-72px)]' : 'min-h-[55vw] sm:min-h-[420px]'} overflow-hidden`}
                     style={{ touchAction: 'none', cursor: isBubbleDragging ? 'grabbing' : 'grab' }}
-                    onPointerDown={handleBubblePointerDown}
+                    onPointerDownCapture={handleBubblePointerDown}
                     onClickCapture={handleBubbleClickCapture}
                   >
                     {classroomData.length === 0 ? (
