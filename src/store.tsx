@@ -90,6 +90,8 @@ export interface User {
   profilePic?: string;
   location?: string;
   golfScore?: number;
+  careerYears?: number;
+  knownPeople?: number;
 }
 
 export interface Interest {
