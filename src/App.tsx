@@ -3,6 +3,7 @@ import { useStore } from './store';
 import MainView from './components/MainView';
 import AdminView from './components/AdminView';
 import MyProfile from './components/MyProfile';
+import QuickSurvey from './components/QuickSurvey';
 import AppView, { AppTab } from './components/AppView';
 import LandingPageView from './components/LandingPageView';
 import InsightView from './components/InsightView';
@@ -10,7 +11,7 @@ import InsightView from './components/InsightView';
 export default function App() {
   const { currentUser, db, logout, isDbLoaded, networkError, clearNetworkError } = useStore();
   const [view, setView] = useState<'main' | 'admin'>('main');
-  const [subView, setSubView] = useState<'landing' | 'app' | 'insight' | 'profile'>('landing');
+  const [subView, setSubView] = useState<'landing' | 'app' | 'insight' | 'profile' | 'survey'>('landing');
   const [lastSubView, setLastSubView] = useState<'landing' | 'app' | 'insight'>('landing');
   const [appViewTab, setAppViewTab] = useState<AppTab>('network');
   // 최초 등록 완료 플래그 — db.interests 비동기 전파와 무관하게 즉시 라우팅 전환을 보장
@@ -28,6 +29,8 @@ export default function App() {
     setLastSubView('landing');
     setRegistrationDone(false);
   };
+
+  const goToSurvey = () => setSubView('survey');
 
   const goToProfile = () => {
     setLastSubView(subView as any);
@@ -57,15 +60,27 @@ export default function App() {
 
     // 최초 정보등록 기록이 없거나, 프로필 수정 모드인 경우
     if (!hasInterests || subView === 'profile') {
+      const isFirstRegistration = !hasInterests;
       return (
         <MyProfile
           onSave={() => {
             setRegistrationDone(true);
-            setSubView(lastSubView);
+            if (isFirstRegistration) {
+              goToSurvey();
+            } else {
+              setSubView(lastSubView);
+            }
           }}
           onLogout={handleLogout}
           showBack={hasInterests}
         />
+      );
+    }
+
+    // Quick Survey: 최초 등록 직후 한 번만 표시
+    if (subView === 'survey') {
+      return (
+        <QuickSurvey onComplete={() => setSubView('landing')} />
       );
     }
 

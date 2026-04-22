@@ -208,11 +208,11 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
       }));
 
       currentSim = d3.forceSimulation(nodes)
-        .force('center', d3.forceCenter(W / 2, H / 2).strength(0.8))
-        .force('collision', d3.forceCollide().radius((d: any) => d.r + 2).strength(1).iterations(6))
-        .force('x', d3.forceX(W / 2).strength(0.06))
-        .force('y', d3.forceY(H / 2).strength(0.06))
-        .alphaDecay(0.015)
+        .force('center', d3.forceCenter(W / 2, H / 2).strength(0.6))
+        .force('collision', d3.forceCollide().radius((d: any) => d.r + 4).strength(1).iterations(6))
+        .force('x', d3.forceX(W / 2).strength(0.04))
+        .force('y', d3.forceY(H / 2).strength(0.04))
+        .alphaDecay(0.012)
         .on('tick', () => {
           const pos: Record<string, { x: number; y: number; r: number }> = {};
           nodes.forEach((n: any) => { pos[n.id] = { x: n.x, y: n.y, r: n.r }; });

@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useRef } from 'react';
+﻿import React, { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
 import { useStore, Interest, User } from '../store';
 import { HYUNDAI_COMPANIES } from '../constants/companies';
 
@@ -31,6 +31,188 @@ type KeywordEntry = {
   keywordGroup: 'work' | 'hobby' | '';
   customInput: string;
 };
+
+interface KeywordCardProps {
+  entry: KeywordEntry;
+  idx: number;
+  role: 'giver' | 'taker';
+  canRemove: boolean;
+  accent: 'primary' | 'secondary';
+  sortedWorkPresets: { id: string; keyword: string; group?: string }[];
+  sortedHobbyPresets: { id: string; keyword: string; group?: string }[];
+  usedKeywords: Map<string, { role: 'giver' | 'taker'; idx: number }>;
+  onUpdate: (idx: number, patch: Partial<KeywordEntry>) => void;
+  onRemove: (idx: number) => void;
+}
+
+const KeywordCard = memo(function KeywordCard({
+  entry, idx, role, canRemove, accent,
+  sortedWorkPresets, sortedHobbyPresets,
+  usedKeywords, onUpdate, onRemove,
+}: KeywordCardProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const accentClass = accent === 'primary' ? 'primary' : 'secondary';
+  const presets = entry.keywordGroup === 'work' ? sortedWorkPresets : entry.keywordGroup === 'hobby' ? sortedHobbyPresets : [];
+
+  useEffect(() => {
+    if (entry.isCustom && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [entry.isCustom]);
+
+  const update = useCallback((patch: Partial<KeywordEntry>) => {
+    onUpdate(idx, patch);
+  }, [onUpdate, idx]);
+
+  const isKeywordUsedElsewhere = (keyword: string): boolean => {
+    const kw = keyword.trim().toLowerCase();
+    const found = usedKeywords.get(kw);
+    if (!found) return false;
+    return !(found.role === role && found.idx === idx);
+  };
+
+  const selectHashtag = (keyword: string) => {
+    update({ keyword, isCustom: false, customInput: '' });
+  };
+
+  const handleCustomInput = (val: string) => {
+    update({ customInput: val, keyword: val.trim() });
+  };
+
+  const duplicateWarning = !!(entry.keyword.trim() && isKeywordUsedElsewhere(entry.keyword));
+
+  return (
+    <div className="bg-surface-container-low p-5 rounded-3xl border border-outline space-y-4 relative shadow-sm">
+      <div className="flex items-center justify-between">
+        <span className={`text-xs font-bold text-${accentClass} bg-${accentClass}/10 px-2 py-0.5 rounded-full uppercase tracking-widest`}>
+          {role === 'giver' ? 'Giver' : 'Taker'} Keyword {idx + 1}
+        </span>
+        <button
+          onClick={() => onRemove(idx)}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${canRemove ? 'bg-error/10 text-error hover:bg-error/20' : 'bg-surface-container-highest text-on-surface-variant/20 cursor-not-allowed'}`}
+          disabled={!canRemove}
+          title={canRemove ? '삭제' : '최소 2개 항목이 필요합니다'}
+        >
+          <span className="material-symbols-outlined text-base">delete</span>
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
+          Step 1 · 키워드 유형 선택
+        </label>
+        <div className="flex gap-2">
+          {([
+            { key: 'work' as const, label: '💼 업무' },
+            { key: 'hobby' as const, label: '🎨 취미' },
+          ]).map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => update({ keywordGroup: opt.key, keyword: '', isCustom: false, customInput: '' })}
+              className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
+                entry.keywordGroup === opt.key
+                  ? `bg-${accentClass} text-on-${accentClass} border-${accentClass} shadow-sm`
+                  : `bg-surface text-on-surface-variant border-outline hover:border-${accentClass}/50`
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {entry.keywordGroup && (
+        <div className="space-y-3">
+          <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
+            Step 2 · 키워드 선택
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {presets.map((p: { id: string; keyword: string }) => {
+              const isSelected = !entry.isCustom && entry.keyword === p.keyword;
+              const isUsed = isKeywordUsedElsewhere(p.keyword);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={isUsed}
+                  onClick={() => !isUsed && selectHashtag(p.keyword)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-all ${
+                    isSelected
+                      ? `bg-${accentClass} text-on-${accentClass} border-${accentClass} shadow-sm`
+                      : isUsed
+                        ? 'bg-surface-container-highest text-on-surface-variant/30 border-outline/40 cursor-not-allowed line-through'
+                        : `bg-surface text-on-surface-variant border-outline hover:border-${accentClass}/60 hover:text-${accentClass} hover:bg-${accentClass}/5`
+                  }`}
+                >
+                  #{p.keyword}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => update({ isCustom: true, keyword: entry.customInput.trim() || '', customInput: entry.customInput })}
+              className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-all flex items-center gap-1 ${
+                entry.isCustom
+                  ? `bg-${accentClass} text-on-${accentClass} border-${accentClass} shadow-sm`
+                  : `bg-surface text-on-surface-variant border-dashed border-outline hover:border-${accentClass}/60 hover:text-${accentClass} hover:bg-${accentClass}/5`
+              }`}
+            >
+              <span className="material-symbols-outlined text-base">edit</span>
+              직접입력
+            </button>
+          </div>
+
+          {entry.isCustom && (
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-base font-bold">#</span>
+              <input
+                ref={inputRef}
+                type="text"
+                value={entry.customInput}
+                onChange={e => handleCustomInput(e.target.value)}
+                placeholder="원하는 키워드를 직접 입력하세요"
+                className={`w-full bg-surface border rounded-xl pl-7 pr-4 py-2.5 text-base outline-none transition-all text-on-surface border-${accentClass} ring-2 ring-${accentClass}/20`}
+              />
+              {entry.customInput && (
+                <span className={`absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-${accentClass} text-lg`}>check_circle</span>
+              )}
+            </div>
+          )}
+
+          {duplicateWarning && (
+            <p className="text-sm text-error font-medium flex items-center gap-1">
+              <span className="material-symbols-outlined text-base">warning</span>
+              이미 등록된 키워드입니다. 중복 키워드는 사용할 수 없습니다.
+            </p>
+          )}
+        </div>
+      )}
+
+      {entry.keyword.trim() && !duplicateWarning && (
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
+            Step 3 · 상세 내용 입력
+          </label>
+          <div className={`text-sm text-${accentClass}/80 font-medium bg-${accentClass}/5 px-3 py-1.5 rounded-lg inline-flex items-center gap-1`}>
+            <span className="material-symbols-outlined text-base">tag</span>
+            {entry.keyword}
+          </div>
+          <textarea
+            value={entry.description}
+            onChange={e => update({ description: e.target.value })}
+            placeholder={role === 'giver'
+              ? `"${entry.keyword}"에 대해 어떤 도움을 줄 수 있는지 구체적으로 적어주세요.`
+              : `"${entry.keyword}"에 대해 어떤 배움을 얻고 싶은지 구체적으로 적어주세요.`
+            }
+            rows={3}
+            className={`w-full bg-surface border border-outline rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-${accentClass}/20 focus:border-${accentClass} transition-all resize-none text-on-surface`}
+          />
+        </div>
+      )}
+    </div>
+  );
+});
 
 export default function MyProfile({ onSave, onLogout, showBack = true, targetUser }: MyProfileProps) {
   const { currentUser: loggedInUser, db, updateUserProfile } = useStore();
@@ -189,174 +371,21 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
     if (takers.length > 2) setTakers(takers.filter((_, i) => i !== idx));
   };
 
-  // 키워드 카드 렌더링 (Giver/Taker 공통)
-  const renderKeywordCard = (
-    entry: KeywordEntry,
-    idx: number,
-    role: 'giver' | 'taker',
-    list: KeywordEntry[],
-    setList: React.Dispatch<React.SetStateAction<KeywordEntry[]>>,
-    removeItem: (idx: number) => void,
-    accent: 'primary' | 'secondary'
-  ) => {
-    const presets = entry.keywordGroup === 'work' ? sortedWorkPresets : entry.keywordGroup === 'hobby' ? sortedHobbyPresets : [];
-    const accentClass = accent === 'primary' ? 'primary' : 'secondary';
-
-    const update = (patch: Partial<KeywordEntry>) => {
-      const next = [...list];
+  const updateGiver = useCallback((idx: number, patch: Partial<KeywordEntry>) => {
+    setGivers(prev => {
+      const next = [...prev];
       next[idx] = { ...next[idx], ...patch };
-      setList(next);
-    };
+      return next;
+    });
+  }, []);
 
-    const selectHashtag = (keyword: string) => {
-      update({ keyword, isCustom: false, customInput: '' });
-    };
-
-    const handleCustomInput = (val: string) => {
-      update({ customInput: val, isCustom: val.trim().length > 0, keyword: val.trim() ? val : '' });
-    };
-
-    const duplicateWarning = entry.keyword.trim() && isKeywordUsedElsewhere(entry.keyword, role, idx);
-
-    return (
-      <div key={idx} className="bg-surface-container-low p-5 rounded-3xl border border-outline space-y-4 relative shadow-sm">
-        <div className="flex items-center justify-between">
-          <span className={`text-xs font-bold text-${accentClass} bg-${accentClass}/10 px-2 py-0.5 rounded-full uppercase tracking-widest`}>
-            {role === 'giver' ? 'Giver' : 'Taker'} Keyword {idx + 1}
-          </span>
-          <button
-            onClick={() => removeItem(idx)}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${list.length > 2 ? 'bg-error/10 text-error hover:bg-error/20' : 'bg-surface-container-highest text-on-surface-variant/20 cursor-not-allowed'}`}
-            disabled={list.length <= 2}
-            title={list.length > 2 ? '삭제' : '최소 2개 항목이 필요합니다'}
-          >
-            <span className="material-symbols-outlined text-base">delete</span>
-          </button>
-        </div>
-
-        {/* Step 1: 유형 선택 */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
-            Step 1 · 키워드 유형 선택
-          </label>
-          <div className="flex gap-2">
-            {([
-              { key: 'work' as const, label: '💼 업무' },
-              { key: 'hobby' as const, label: '🎨 취미' },
-            ]).map(opt => (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() => update({ keywordGroup: opt.key, keyword: '', isCustom: false, customInput: '' })}
-                className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
-                  entry.keywordGroup === opt.key
-                    ? `bg-${accentClass} text-on-${accentClass} border-${accentClass} shadow-sm`
-                    : `bg-surface text-on-surface-variant border-outline hover:border-${accentClass}/50`
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Step 2: 키워드 선택 (유형 선택 후 노출) */}
-        {entry.keywordGroup && (
-          <div className="space-y-3">
-            <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
-              Step 2 · 키워드 선택
-            </label>
-
-            {/* 해시태그 + 직접입력 버튼 */}
-            <div className="flex flex-wrap gap-2">
-              {presets.map(p => {
-                const isSelected = !entry.isCustom && entry.keyword === p.keyword;
-                const isUsed = isKeywordUsedElsewhere(p.keyword, role, idx);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    disabled={isUsed}
-                    onClick={() => !isUsed && selectHashtag(p.keyword)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-all ${
-                      isSelected
-                        ? `bg-${accentClass} text-on-${accentClass} border-${accentClass} shadow-sm`
-                        : isUsed
-                          ? 'bg-surface-container-highest text-on-surface-variant/30 border-outline/40 cursor-not-allowed line-through'
-                          : `bg-surface text-on-surface-variant border-outline hover:border-${accentClass}/60 hover:text-${accentClass} hover:bg-${accentClass}/5`
-                    }`}
-                  >
-                    #{p.keyword}
-                  </button>
-                );
-              })}
-              {/* 직접입력 해시태그 버튼 */}
-              <button
-                type="button"
-                onClick={() => update({ isCustom: true, keyword: entry.customInput.trim() || '', customInput: entry.customInput })}
-                className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-all flex items-center gap-1 ${
-                  entry.isCustom
-                    ? `bg-${accentClass} text-on-${accentClass} border-${accentClass} shadow-sm`
-                    : `bg-surface text-on-surface-variant border-dashed border-outline hover:border-${accentClass}/60 hover:text-${accentClass} hover:bg-${accentClass}/5`
-                }`}
-              >
-                <span className="material-symbols-outlined text-base">edit</span>
-                직접입력
-              </button>
-            </div>
-
-            {/* 직접입력 선택 시 텍스트 입력창 노출 */}
-            {entry.isCustom && (
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-base font-bold">#</span>
-                <input
-                  type="text"
-                  value={entry.customInput}
-                  onChange={e => handleCustomInput(e.target.value)}
-                  placeholder="원하는 키워드를 직접 입력하세요"
-                  autoFocus
-                  className={`w-full bg-surface border rounded-xl pl-7 pr-4 py-2.5 text-base outline-none transition-all text-on-surface border-${accentClass} ring-2 ring-${accentClass}/20`}
-                />
-                {entry.customInput && (
-                  <span className={`absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-${accentClass} text-lg`}>check_circle</span>
-                )}
-              </div>
-            )}
-
-            {duplicateWarning && (
-              <p className="text-sm text-error font-medium flex items-center gap-1">
-                <span className="material-symbols-outlined text-base">warning</span>
-                이미 등록된 키워드입니다. 중복 키워드는 사용할 수 없습니다.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Step 3: 상세 내용 (키워드 선택 후 노출) */}
-        {entry.keyword.trim() && !duplicateWarning && (
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase ml-1 tracking-widest">
-              Step 3 · 상세 내용 입력
-            </label>
-            <div className={`text-sm text-${accentClass}/80 font-medium bg-${accentClass}/5 px-3 py-1.5 rounded-lg inline-flex items-center gap-1`}>
-              <span className="material-symbols-outlined text-base">tag</span>
-              {entry.keyword}
-            </div>
-            <textarea
-              value={entry.description}
-              onChange={e => update({ description: e.target.value })}
-              placeholder={role === 'giver'
-                ? `"${entry.keyword}"에 대해 어떤 도움을 줄 수 있는지 구체적으로 적어주세요.`
-                : `"${entry.keyword}"에 대해 어떤 배움을 얻고 싶은지 구체적으로 적어주세요.`
-              }
-              rows={3}
-              className={`w-full bg-surface border border-outline rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-${accentClass}/20 focus:border-${accentClass} transition-all resize-none text-on-surface`}
-            />
-          </div>
-        )}
-      </div>
-    );
-  };
+  const updateTaker = useCallback((idx: number, patch: Partial<KeywordEntry>) => {
+    setTakers(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...patch };
+      return next;
+    });
+  }, []);
 
   return (
     <div className="absolute inset-0 flex flex-col bg-background text-on-surface">
@@ -502,7 +531,21 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                 자신이 다른 리더들에게 줄 수 있는 전문분야나 관심사가 있다면 키워드와 함께 이유를 상세히 적어주세요. (최소 2개, 최대 5개)
               </p>
               <div className="grid gap-6">
-                {givers.map((g, idx) => renderKeywordCard(g, idx, 'giver', givers, setGivers, removeGiver, 'primary'))}
+                {givers.map((g, idx) => (
+                  <KeywordCard
+                    key={idx}
+                    entry={g}
+                    idx={idx}
+                    role="giver"
+                    accent="primary"
+                    canRemove={givers.length > 2}
+                    sortedWorkPresets={sortedWorkPresets}
+                    sortedHobbyPresets={sortedHobbyPresets}
+                    usedKeywords={allUsedKeywords}
+                    onUpdate={updateGiver}
+                    onRemove={removeGiver}
+                  />
+                ))}
               </div>
               {givers.length < 5 && (
                 <button
@@ -528,7 +571,21 @@ export default function MyProfile({ onSave, onLogout, showBack = true, targetUse
                 자신이 다른 리더들로부터 배우고 싶거나, 도움을 받고 싶은 키워드를 선택하시고, 이유를 상세히 적어주세요. (최소 2개, 최대 5개)
               </p>
               <div className="grid gap-6">
-                {takers.map((t, idx) => renderKeywordCard(t, idx, 'taker', takers, setTakers, removeTaker, 'secondary'))}
+                {takers.map((t, idx) => (
+                  <KeywordCard
+                    key={idx}
+                    entry={t}
+                    idx={idx}
+                    role="taker"
+                    accent="secondary"
+                    canRemove={takers.length > 2}
+                    sortedWorkPresets={sortedWorkPresets}
+                    sortedHobbyPresets={sortedHobbyPresets}
+                    usedKeywords={allUsedKeywords}
+                    onUpdate={updateTaker}
+                    onRemove={removeTaker}
+                  />
+                ))}
               </div>
               {takers.length < 5 && (
                 <button

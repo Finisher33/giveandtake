@@ -89,6 +89,7 @@ export interface User {
   courseId: string;
   profilePic?: string;
   location?: string;
+  golfScore?: number;
 }
 
 export interface Interest {
@@ -788,8 +789,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Similarity threshold: 0.75 (synonym-level grouping)
-    if (bestMatch && maxSimilarity > 0.75) {
+    // Similarity threshold: 0.65 (broader grouping — related concepts are merged)
+    if (bestMatch && maxSimilarity > 0.65) {
       return { canonicalId: bestMatch.id, term: bestMatch.term };
     } else {
       const newId = Date.now().toString();
