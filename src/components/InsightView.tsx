@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, CSSProperties } from 'react';
 import { useStore, UserInsight } from '../store';
+import { cosineSimilarity } from '../services/embeddingService';
 import { motion, AnimatePresence } from 'motion/react';
 import NotificationBell from './NotificationBell';
 import * as d3 from 'd3';
@@ -91,13 +92,10 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
     if (!classroomSessionId) return [];
     const sessionInsights = (db.userInsights || []).filter(i => i.sessionId === classroomSessionId);
 
+    // Step 1: Initial grouping by stored canonicalId
     const groups: Record<string, { count: number, originalKeywords: string[], insights: UserInsight[] }> = {};
-
     sessionInsights.forEach(insight => {
       const repId = insight.canonicalId || insight.keyword;
-      const term = db.canonicalTerms?.find(t => t.id === repId);
-      const repName = term ? term.term : insight.keyword;
-
       if (!groups[repId]) {
         groups[repId] = { count: 0, originalKeywords: [], insights: [] };
       }
@@ -108,7 +106,54 @@ export default function InsightView({ onBack, onLogout, onProfileClick, onNotifi
       groups[repId].insights.push(insight);
     });
 
-    return Object.entries(groups).map(([id, data]) => {
+    const ids = Object.keys(groups);
+
+    // Step 2: Union-Find re-grouping using stored embeddings at 0.65 threshold
+    // This retroactively applies the new threshold to existing Firestore data
+    const parent: Record<string, string> = {};
+    ids.forEach(id => { parent[id] = id; });
+
+    const find = (x: string): string => {
+      if (parent[x] !== x) parent[x] = find(parent[x]);
+      return parent[x];
+    };
+
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const termA = db.canonicalTerms?.find(t => t.id === ids[i]);
+        const termB = db.canonicalTerms?.find(t => t.id === ids[j]);
+        if (termA?.embedding && termB?.embedding) {
+          if (cosineSimilarity(termA.embedding, termB.embedding) > 0.65) {
+            // Union: lower-count group absorbs into higher-count root
+            const ra = find(ids[i]);
+            const rb = find(ids[j]);
+            if (ra !== rb) {
+              if ((groups[ra]?.count || 0) >= (groups[rb]?.count || 0)) {
+                parent[rb] = ra;
+              } else {
+                parent[ra] = rb;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Step 3: Merge groups according to union-find result
+    const merged: Record<string, { count: number, originalKeywords: string[], insights: UserInsight[] }> = {};
+    ids.forEach(id => {
+      const root = find(id);
+      if (!merged[root]) {
+        merged[root] = { count: 0, originalKeywords: [], insights: [] };
+      }
+      merged[root].count += groups[id].count;
+      groups[id].originalKeywords.forEach(k => {
+        if (!merged[root].originalKeywords.includes(k)) merged[root].originalKeywords.push(k);
+      });
+      merged[root].insights.push(...groups[id].insights);
+    });
+
+    return Object.entries(merged).map(([id, data]) => {
       const term = db.canonicalTerms?.find(t => t.id === id);
       return {
         id,
